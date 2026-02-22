@@ -4,6 +4,7 @@ Chat endpoints for the Gateway API.
 
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from app.middleware.auth import JWTPayload, get_current_user
 from app.models.chat import (
@@ -12,6 +13,7 @@ from app.models.chat import (
     ChatMessage,
     ChatMode,
     SessionInfo,
+    SessionRenameRequest,
     SessionListResponse,
 )
 from app.services.database import DatabaseService, get_database_service
@@ -160,6 +162,31 @@ async def get_session_messages(
     ]
 
 
+@router.patch("/sessions/{session_id}", response_model=SessionInfo)
+async def rename_session(
+    session_id: str,
+    request: SessionRenameRequest,
+    user: JWTPayload = Depends(get_current_user),
+    db: DatabaseService = Depends(get_database_service),
+) -> SessionInfo:
+    """Rename a chat session."""
+    session = db.get_session(session_id, user.user_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found"
+        )
+    db.update_session_title(session_id, user.user_id, request.title)
+    updated = db.get_session(session_id, user.user_id)
+    return SessionInfo(
+        id=updated["id"],
+        title=updated["title"],
+        created_at=updated["created_at"],
+        updated_at=updated["updated_at"],
+        is_archived=updated.get("is_archived", False),
+    )
+
+
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
     session_id: str,
@@ -173,3 +200,105 @@ async def delete_session(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found"
         )
+
+
+@router.post("/stream")
+async def send_message_stream(
+    request: ChatRequest,
+    user: JWTPayload = Depends(get_current_user),
+    db: DatabaseService = Depends(get_database_service),
+    inference: InferenceService = Depends(get_inference_service),
+):
+    """
+    Send a message and stream the AI response via Server-Sent Events (SSE).
+    
+    - Same session/message logic as POST /chat
+    - Returns SSE stream with OpenAI-compatible chunks
+    - Final event includes full content for database storage
+    """
+    import json
+    
+    user_id = user.user_id
+    
+    # Get or create session
+    if request.session_id:
+        session = db.get_session(request.session_id, user_id)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found"
+            )
+    else:
+        title = request.message[:50] + "..." if len(request.message) > 50 else request.message
+        session = db.create_session(user_id, title)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create session"
+            )
+    
+    session_id = session["id"]
+    
+    # Store user message
+    user_msg = db.create_message(
+        session_id=session_id,
+        user_id=user_id,
+        role="user",
+        content=request.message,
+    )
+    if not user_msg:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to store message"
+        )
+    
+    # Get conversation history
+    history = db.get_session_messages(session_id, user_id, limit=20)
+    messages = [
+        {"role": msg["role"], "content": msg["content"]}
+        for msg in history
+    ]
+    
+    async def event_generator():
+        """Generate SSE events from inference stream."""
+        full_content = []
+        
+        # Emit session ID as first event so frontend can track it
+        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
+        
+        async for chunk in inference.generate_response_stream(
+            messages=messages,
+            mode=request.mode.value,
+        ):
+            # Collect content for final save
+            try:
+                if chunk.startswith("data: ") and not chunk.strip().endswith("[DONE]"):
+                    data = json.loads(chunk[6:])
+                    delta = data.get("choices", [{}])[0].get("delta", {})
+                    if "content" in delta:
+                        full_content.append(delta["content"])
+            except (json.JSONDecodeError, IndexError, KeyError):
+                pass
+            
+            yield chunk
+        
+        # After stream ends, save assistant message to DB
+        content = "".join(full_content)
+        if content:
+            db.create_message(
+                session_id=session_id,
+                user_id=user_id,
+                role="assistant",
+                content=content,
+                mode_used=request.mode.value,
+            )
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Session-ID": session_id,
+        },
+    )

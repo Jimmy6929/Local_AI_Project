@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     inference_instant_url: str = ""
     inference_thinking_url: str = ""
     
+    # Inference Settings
+    inference_model_name: str = "default"  # Model name to send to vLLM/TGI
+    inference_max_tokens: int = 2048
+    inference_temperature: float = 0.7
+    inference_timeout: float = 120.0  # seconds
+    inference_stream: bool = True  # Enable streaming responses
+    
     # Database URL (for direct connections if needed)
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 

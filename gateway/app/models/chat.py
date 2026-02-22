@@ -46,6 +46,11 @@ class SessionInfo(BaseModel):
     is_archived: bool = False
 
 
+class SessionRenameRequest(BaseModel):
+    """Request body for PATCH /chat/sessions/{id}."""
+    title: str = Field(..., min_length=1, max_length=200, description="New session title")
+
+
 class SessionListResponse(BaseModel):
     """Response for listing sessions."""
     sessions: List[SessionInfo]
