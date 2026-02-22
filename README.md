@@ -4,7 +4,7 @@ A private, self-hosted AI assistant system with multi-user support, two-tier inf
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## 🌟 Overview
+## Overview
 
 Local AI Assistant is a production-ready chat application that provides a ChatGPT-like experience while running entirely on your own infrastructure. It features:
 
@@ -13,7 +13,7 @@ Local AI Assistant is a production-ready chat application that provides a ChatGP
 - **Multi-User Ready**: Row-level security (RLS) enabled from day one
 - **No Third-Party LLM Costs**: Use your own GPU infrastructure for inference
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -62,7 +62,7 @@ Local AI Assistant is a production-ready chat application that provides a ChatGP
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 assistant-staging/
@@ -98,7 +98,7 @@ assistant-staging/
 └── README.md
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -191,7 +191,7 @@ npm run dev
 
 The Web App will be available at http://localhost:3000
 
-## 🔧 API Reference
+## API Reference
 
 ### Health Endpoints
 
@@ -235,7 +235,7 @@ The Web App will be available at http://localhost:3000
 }
 ```
 
-## 🗄️ Database Schema
+## Database Schema
 
 ### Tables
 
@@ -264,7 +264,7 @@ All tables have RLS enabled. Users can only access their own data:
 - `chat_messages`: Users can CRUD only messages in their sessions
 - `documents`: Users can CRUD only their own documents
 
-## 🤖 Inference Modes
+## Inference Modes
 
 ### Instant Mode (Default)
 
@@ -280,7 +280,7 @@ All tables have RLS enabled. Users can only access their own data:
 - **Latency**: 10-30 seconds (includes cold start)
 - **Model**: Stronger reasoning model
 
-## 🔐 Security
+## Security
 
 ### Authentication Flow
 
@@ -297,7 +297,7 @@ All tables have RLS enabled. Users can only access their own data:
 - **Private Inference**: GPU endpoints not publicly accessible
 - **CORS Configuration**: Restricted to allowed origins
 
-## 📖 Documentation
+## Documentation
 
 Detailed documentation is available in the `/docs` folder:
 
@@ -314,7 +314,7 @@ Detailed documentation is available in the `/docs` folder:
 | `08_ROADMAP/` | Development phases |
 | `09_DECISIONS/` | Architecture Decision Records (ADRs) |
 
-## 🛣️ Roadmap
+## Roadmap
 
 ### Phase 1: Chat MVP ✅ (Current)
 - [x] Local Supabase setup
@@ -347,7 +347,7 @@ Detailed documentation is available in the `/docs` folder:
 - [ ] Rate limiting
 - [ ] Monitoring & alerting
 
-## 🧪 Testing
+## Testing
 
 ### Gateway API Tests
 
@@ -377,7 +377,7 @@ npx tsc --noEmit
 npm run lint
 ```
 
-## 🛠️ Development
+## Development
 
 ### Environment Variables
 
@@ -418,7 +418,7 @@ supabase db reset
 supabase migration list
 ```
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -426,11 +426,11 @@ supabase migration list
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Supabase](https://supabase.com/) - Backend as a Service
 - [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
@@ -439,4 +439,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-Built with ❤️ for privacy-conscious AI enthusiasts
+Built for privacy-conscious AI enthusiasts.
