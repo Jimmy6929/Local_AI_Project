@@ -6,6 +6,12 @@ server that exposes an **OpenAI-compatible** `/v1/chat/completions` endpoint.
 The Gateway is already wired to call this endpoint. Once you start the
 server and set `INFERENCE_INSTANT_URL` in your `.env`, everything works.
 
+> **Looking for the Thinking tier?** See
+> [GPU_SETUP_GUIDE_THINKING.md](GPU_SETUP_GUIDE_THINKING.md) for
+> deploying stronger models (30B-72B) on serverless scale-to-zero GPU.
+> Both tiers use the same OpenAI-compatible API and work with any
+> open-source model.
+
 ---
 
 ## 1. Choose a Provider

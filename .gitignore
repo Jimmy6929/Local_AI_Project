@@ -35,5 +35,8 @@ build/
 supabase/.branches/
 supabase/.temp/
 
+# Project docs (reference folder - do not push)
+Local_AI_model_Project_doc/
+
 # Logs
 *.log

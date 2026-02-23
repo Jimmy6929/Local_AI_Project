@@ -1,5 +1,6 @@
 """
 Health check endpoints for the Gateway API.
+Includes dual-tier inference health with model info per mode.
 """
 
 from typing import Optional, Dict, Any
@@ -29,9 +30,10 @@ class AuthenticatedHealthResponse(HealthResponse):
 
 
 class InferenceHealthResponse(BaseModel):
-    """Health check response for inference endpoints."""
+    """Health check response for inference endpoints (both tiers)."""
     instant: Dict[str, Any]
     thinking: Dict[str, Any]
+    routing: Dict[str, Any]
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -67,15 +69,26 @@ async def authenticated_health_check(
 @router.get("/health/inference", response_model=InferenceHealthResponse)
 async def inference_health_check(
     inference: InferenceService = Depends(get_inference_service),
+    settings: Settings = Depends(get_settings),
 ) -> InferenceHealthResponse:
     """
     Check health of inference endpoints (instant and thinking).
-    Public endpoint — no auth required.
+    Shows per-tier model, config, and availability.
+    Public endpoint -- no auth required.
     """
     instant_status = await inference.check_health("instant")
     thinking_status = await inference.check_health("thinking")
-    
+
+    routing_info = {
+        "default_mode": settings.routing_default_mode,
+        "thinking_fallback_to_instant": settings.routing_thinking_fallback_to_instant,
+        "cold_start_timeout": settings.routing_cold_start_timeout,
+        "thinking_daily_request_limit": settings.thinking_daily_request_limit,
+        "thinking_max_concurrent": settings.thinking_max_concurrent,
+    }
+
     return InferenceHealthResponse(
         instant=instant_status,
         thinking=thinking_status,
+        routing=routing_info,
     )

@@ -20,8 +20,13 @@ async def lifespan(app: FastAPI):
     print(f" Starting {settings.app_name}")
     print(f"   Supabase URL: {settings.supabase_url}")
     print(f"   Debug mode: {settings.debug}")
+    print(f"   Instant tier: {settings.inference_instant_url or '(not configured — mock)'}")
+    print(f"     Model: {settings.get_model_for_mode('instant')}")
+    print(f"   Thinking tier: {settings.inference_thinking_url or '(not configured — mock/fallback)'}")
+    print(f"     Model: {settings.get_model_for_mode('thinking')}")
+    print(f"   Thinking fallback to instant: {settings.routing_thinking_fallback_to_instant}")
     yield
-    print(f"👋 Shutting down {settings.app_name}")
+    print(f"Shutting down {settings.app_name}")
 
 
 def create_app() -> FastAPI:

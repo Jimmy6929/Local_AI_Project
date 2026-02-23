@@ -12,6 +12,7 @@ from app.models.chat import (
     ChatResponse,
     ChatMessage,
     ChatMode,
+    InferenceMetadata,
     SessionInfo,
     SessionRenameRequest,
     SessionListResponse,
@@ -100,6 +101,19 @@ async def send_message(
             detail="Failed to store response"
         )
     
+    # Build inference metadata for the response
+    inference_meta = InferenceMetadata(
+        mode_used=inference_result["mode_used"],
+        model=inference_result.get("model"),
+        fallback_used=inference_result.get("fallback_used", False),
+        original_mode=inference_result.get("original_mode"),
+        latency_ms=inference_result.get("latency_ms"),
+        tokens_used=inference_result.get("tokens_used"),
+        prompt_tokens=inference_result.get("prompt_tokens"),
+        completion_tokens=inference_result.get("completion_tokens"),
+        finish_reason=inference_result.get("finish_reason"),
+    )
+    
     return ChatResponse(
         session_id=session_id,
         message=ChatMessage(
@@ -107,9 +121,11 @@ async def send_message(
             role="assistant",
             content=assistant_msg["content"],
             mode_used=assistant_msg.get("mode_used"),
+            model_used=inference_result.get("model"),
             created_at=assistant_msg["created_at"],
         ),
         session_title=session.get("title"),
+        inference=inference_meta,
     )
 
 
@@ -156,6 +172,7 @@ async def get_session_messages(
             role=m["role"],
             content=m["content"],
             mode_used=m.get("mode_used"),
+            model_used=m.get("model_used"),
             created_at=m["created_at"],
         )
         for m in messages
