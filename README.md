@@ -146,7 +146,7 @@ supabase start
 
 # Step 2 — Start the Gateway API
 cd gateway
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Step 3 — Start the Web App
 cd webapp
@@ -169,6 +169,34 @@ open http://localhost:3000                     # Web App
 | **Web App** | http://localhost:3000 | Next.js frontend |
 
 > **Note:** The Gateway is required for all chat operations (send message, load history, manage sessions). Login/signup talks to Supabase directly, but everything else goes through the Gateway.
+
+### Stopping & Checking Services
+
+Check if a service is running:
+
+```bash
+lsof -i :8000    # Gateway
+lsof -i :3000    # Web App
+lsof -i :54321   # Supabase
+```
+
+Stop a service:
+
+```bash
+# Stop Gateway
+kill $(lsof -t -i :8000)
+
+# Stop Web App
+kill $(lsof -t -i :3000)
+
+# Stop Supabase
+supabase stop
+
+# Or if the service is running in a terminal, just press Ctrl+C
+```
+
+> **Tip:** If you get `Address already in use` when starting a service, it's already running.
+> Run `curl http://127.0.0.1:8000/health` to confirm, or kill it with `kill $(lsof -t -i :8000)` and restart.
 
 ### 1. Clone the Repository
 
