@@ -38,16 +38,18 @@ class Settings(BaseSettings):
     # Both tiers use OpenAI-compatible APIs via mlx_lm.server
     # and work with ANY MLX-quantized model from mlx-community.
     
-    # Instant tier — fast, always-on
+    # Instant tier — fast, always-on (mlx_vlm.server for VLMs)
     inference_instant_url: str = ""
     inference_instant_model: str = ""          # e.g. mlx-community/Qwen3.5-9B-4bit
+    inference_instant_api_prefix: str = ""     # "" for mlx_vlm, "/v1" for mlx_lm
     inference_instant_max_tokens: int = 2048
     inference_instant_temperature: float = 0.7
     inference_instant_timeout: float = 120.0   # seconds
     
-    # Thinking tier — stronger, deeper reasoning
+    # Thinking tier — stronger, deeper reasoning (mlx_lm.server for text LLMs)
     inference_thinking_url: str = ""
     inference_thinking_model: str = ""         # e.g. mlx-community/Qwen3-14B-4bit-AWQ
+    inference_thinking_api_prefix: str = "/v1" # "/v1" for mlx_lm, "" for mlx_vlm
     inference_thinking_max_tokens: int = 4096
     inference_thinking_temperature: float = 0.5  # more focused for reasoning
     inference_thinking_timeout: float = 300.0    # 5 min — cold start + reasoning
@@ -72,6 +74,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
     
     # ── Helpers ────────────────────────────────────────────────
+    
+    def get_api_prefix_for_mode(self, mode: str) -> str:
+        """Return the API path prefix for the given mode ('/v1' or '')."""
+        if mode == "thinking":
+            return self.inference_thinking_api_prefix
+        return self.inference_instant_api_prefix
     
     def get_model_for_mode(self, mode: str) -> str:
         """Return the model name for the given mode, with fallback."""

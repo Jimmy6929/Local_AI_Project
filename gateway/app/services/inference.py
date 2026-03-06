@@ -2,15 +2,12 @@
 Inference service for calling LLM endpoints.
 
 Supports two-tier inference (Instant + Thinking) via OpenAI-compatible
-APIs (MLX, vLLM, TGI, llama.cpp, etc.). Works with ANY open-source
-model -- routing, token limits, and timeouts are mode-aware.
+APIs. Each tier can use a different server type:
+  - mlx_vlm.server  → VLMs like Qwen3.5 (endpoints at /chat/completions)
+  - mlx_lm.server   → text LLMs like Qwen3  (endpoints at /v1/chat/completions)
 
-Key design principles:
-  - Both tiers use the same OpenAI /v1/chat/completions interface
-  - Model name, max_tokens, temperature, timeout differ per mode
-  - Thinking mode falls back to Instant if its endpoint is down
-  - Cold-start tolerance built in for serverless thinking endpoints
-  - Mock responses when no endpoint is configured
+The API prefix ("/v1" or "") is configurable per tier so both server
+types work transparently through the same gateway code.
 """
 
 from typing import Optional, List, Dict, Any, AsyncIterator
@@ -42,6 +39,10 @@ class InferenceService:
         self.instant_model = settings.get_model_for_mode("instant")
         self.thinking_model = settings.get_model_for_mode("thinking")
 
+        # Per-mode API prefix ("" for mlx_vlm, "/v1" for mlx_lm)
+        self.instant_api_prefix = settings.get_api_prefix_for_mode("instant")
+        self.thinking_api_prefix = settings.get_api_prefix_for_mode("thinking")
+
         # Fallback & routing config
         self.fallback_to_instant = settings.routing_thinking_fallback_to_instant
         self.cold_start_timeout = settings.routing_cold_start_timeout
@@ -53,6 +54,12 @@ class InferenceService:
         if mode == "thinking":
             return self.thinking_url
         return self.instant_url
+
+    def _get_api_prefix(self, mode: str) -> str:
+        """Get the API path prefix for the given mode ('' or '/v1')."""
+        if mode == "thinking":
+            return self.thinking_api_prefix
+        return self.instant_api_prefix
 
     def _get_model(self, mode: str) -> str:
         """Get the model name for the given mode."""
@@ -92,9 +99,10 @@ class InferenceService:
             }
 
         try:
+            prefix = self._get_api_prefix(mode)
             async with httpx.AsyncClient(timeout=10.0) as client:
-                # Try /health first (vLLM), then /v1/models (OpenAI standard)
-                for path in ["/health", "/v1/models"]:
+                # Try /health first, then {prefix}/models (adapts to server type)
+                for path in ["/health", f"{prefix}/models"]:
                     try:
                         response = await client.get(f"{endpoint}{path}")
                         if response.status_code == 200:
@@ -108,12 +116,14 @@ class InferenceService:
                                 "temperature": self._get_temperature(mode),
                                 "timeout": self._get_timeout(mode),
                             }
-                            # If /v1/models returned, list available models
-                            if path == "/v1/models":
+                            if "models" in path:
                                 try:
                                     data = response.json()
-                                    models = [m.get("id") for m in data.get("data", [])]
-                                    result["available_models"] = models
+                                    models_list = data.get("data", [])
+                                    if isinstance(models_list, list):
+                                        result["available_models"] = [
+                                            m.get("id") for m in models_list
+                                        ]
                                 except Exception:
                                     pass
                             return result
@@ -193,6 +203,7 @@ class InferenceService:
                     temperature=(temperature if temperature is not None
                                  else self._get_temperature("instant")),
                     timeout=self._get_timeout("instant"),
+                    api_prefix=self._get_api_prefix("instant"),
                 )
                 result["fallback_used"] = True
                 result["original_mode"] = "thinking"
@@ -213,6 +224,7 @@ class InferenceService:
             temperature=(temperature if temperature is not None
                          else self._get_temperature(mode)),
             timeout=self._get_timeout(mode),
+            api_prefix=self._get_api_prefix(mode),
         )
 
         # If thinking call failed and fallback is enabled, try instant
@@ -230,6 +242,7 @@ class InferenceService:
                 temperature=(temperature if temperature is not None
                              else self._get_temperature("instant")),
                 timeout=self._get_timeout("instant"),
+                api_prefix=self._get_api_prefix("instant"),
             )
             result["fallback_used"] = True
             result["original_mode"] = "thinking"
@@ -247,15 +260,16 @@ class InferenceService:
         max_tokens: int,
         temperature: float,
         timeout: float,
+        api_prefix: str = "/v1",
     ) -> Dict[str, Any]:
         """
         Make the actual HTTP call to the inference endpoint.
-        Model-agnostic -- works with any OpenAI-compatible server.
+        Works with both mlx_lm (/v1/...) and mlx_vlm (/...) servers.
         """
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(
-                    f"{endpoint}/v1/chat/completions",
+                    f"{endpoint}{api_prefix}/chat/completions",
                     json={
                         "model": model,
                         "messages": messages,
@@ -351,6 +365,8 @@ class InferenceService:
                     yield chunk
                 return
 
+        prefix = self._get_api_prefix(mode)
+
         try:
             # Emit mode metadata as first event
             meta = {"mode": mode, "model": model, "fallback_used": fallback_used}
@@ -359,7 +375,7 @@ class InferenceService:
             async with httpx.AsyncClient(timeout=resolved_timeout) as client:
                 async with client.stream(
                     "POST",
-                    f"{endpoint}/v1/chat/completions",
+                    f"{endpoint}{prefix}/chat/completions",
                     json={
                         "model": model,
                         "messages": messages,
@@ -380,6 +396,7 @@ class InferenceService:
             # If thinking failed, try fallback stream
             if mode == "thinking" and self.fallback_to_instant and self.instant_url:
                 print("[inference] Falling back to instant stream")
+                fb_prefix = self._get_api_prefix("instant")
                 fallback_meta = {
                     "mode": "instant",
                     "model": self.instant_model,
@@ -393,7 +410,7 @@ class InferenceService:
                     ) as client:
                         async with client.stream(
                             "POST",
-                            f"{self.instant_url}/v1/chat/completions",
+                            f"{self.instant_url}{fb_prefix}/chat/completions",
                             json={
                                 "model": self.instant_model,
                                 "messages": messages,
