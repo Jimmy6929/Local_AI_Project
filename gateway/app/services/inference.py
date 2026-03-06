@@ -2,7 +2,7 @@
 Inference service for calling LLM endpoints.
 
 Supports two-tier inference (Instant + Thinking) via OpenAI-compatible
-APIs (vLLM, TGI, Ollama, llama.cpp, etc.). Works with ANY open-source
+APIs (MLX, vLLM, TGI, llama.cpp, etc.). Works with ANY open-source
 model -- routing, token limits, and timeouts are mode-aware.
 
 Key design principles:
@@ -25,7 +25,7 @@ class InferenceService:
     """
     Service for LLM inference calls via OpenAI-compatible API.
 
-    Supports any open-source model served through vLLM, TGI, Ollama,
+    Supports any open-source model served through MLX, vLLM, TGI,
     llama.cpp server, or any OpenAI-compatible endpoint. The service
     is model-agnostic -- model name is purely a config value passed
     through to the server.
@@ -443,7 +443,7 @@ class InferenceService:
                 f"To connect a real model:\n"
                 f"- **Instant**: Set `INFERENCE_INSTANT_URL` and `INFERENCE_INSTANT_MODEL`\n"
                 f"- **Thinking**: Set `INFERENCE_THINKING_URL` and `INFERENCE_THINKING_MODEL`\n\n"
-                f"Any OpenAI-compatible server works (vLLM, TGI, Ollama, llama.cpp)."
+                f"Any OpenAI-compatible server works (MLX, vLLM, TGI, llama.cpp)."
             )
         else:
             content = (

@@ -42,9 +42,9 @@ Local AI Assistant is a production-ready chat application that provides a ChatGP
 ┌─────────────────────┐                ┌─────────────────────┐
 │   INSTANT INFERENCE │                │  THINKING INFERENCE │
 │  ┌───────────────┐  │                │  ┌───────────────┐  │
-│  │   GPU Pod     │  │                │  │ Serverless GPU│  │
-│  │  Always-On    │  │                │  │ Scale-to-Zero │  │
-│  │  Fast Model   │  │                │  │ Strong Model  │  │
+│  │ MLX Server    │  │                │  │ MLX Server    │  │
+│  │ :8080         │  │                │  │ :8081         │  │
+│  │ Qwen3.5-9B   │  │                │  │ Qwen3-14B    │  │
 │  └───────────────┘  │                │  └───────────────┘  │
 └─────────────────────┘                └─────────────────────┘
                               │
@@ -339,19 +339,35 @@ All tables have RLS enabled. Users can only access their own data:
 
 ## Inference Modes
 
+Both tiers run on Apple Silicon via [MLX](https://github.com/ml-explore/mlx-lm), each as a separate `mlx_lm.server` instance exposing OpenAI-compatible `/v1/chat/completions`.
+
 ### Instant Mode (Default)
 
 - **Use Case**: Daily tasks, coding assistance, quick answers
-- **Infrastructure**: Always-on GPU pod
+- **Infrastructure**: MLX-LM server on port 8080 (M2 Pro)
 - **Latency**: < 3 seconds
-- **Model**: Fast, efficient LLM
+- **Model**: `mlx-community/Qwen3.5-9B-4bit`
 
 ### Thinking Mode
 
 - **Use Case**: Complex reasoning, deep analysis, research
-- **Infrastructure**: Serverless GPU (scale-to-zero)
-- **Latency**: 10-30 seconds (includes cold start)
-- **Model**: Stronger reasoning model
+- **Infrastructure**: MLX-LM server on port 8081 (M2 Pro)
+- **Latency**: 5-15 seconds
+- **Model**: `mlx-community/Qwen3-14B-4bit-AWQ`
+
+### MLX Setup (GPU Machine)
+
+On the M2 Pro machine, install MLX-LM and start both servers:
+
+```bash
+pip install mlx-lm
+
+# Terminal 1 — Instant tier
+mlx_lm.server --model mlx-community/Qwen3.5-9B-4bit --host 0.0.0.0 --port 8080
+
+# Terminal 2 — Thinking tier
+mlx_lm.server --model mlx-community/Qwen3-14B-4bit-AWQ --host 0.0.0.0 --port 8081
+```
 
 ## Security
 

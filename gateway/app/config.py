@@ -4,7 +4,7 @@ Loads from environment variables and .env file.
 
 Supports two-tier inference: Instant (fast, always-on) and Thinking
 (stronger, scale-to-zero). Both use OpenAI-compatible /v1/chat/completions
-and work with any open-source model served via vLLM, TGI, Ollama, etc.
+and work with any open-source model served via MLX, vLLM, TGI, etc.
 """
 
 from functools import lru_cache
@@ -35,19 +35,19 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     
     # ── Inference Endpoints ────────────────────────────────────
-    # Both tiers use OpenAI-compatible APIs and work with ANY
-    # open-source model (Llama, Mistral, Qwen, DeepSeek, etc.)
+    # Both tiers use OpenAI-compatible APIs via mlx_lm.server
+    # and work with ANY MLX-quantized model from mlx-community.
     
-    # Instant tier — fast, always-on (7B-13B models)
+    # Instant tier — fast, always-on
     inference_instant_url: str = ""
-    inference_instant_model: str = ""          # e.g. mistralai/Mistral-7B-Instruct-v0.3
+    inference_instant_model: str = ""          # e.g. mlx-community/Qwen3.5-9B-4bit
     inference_instant_max_tokens: int = 2048
     inference_instant_temperature: float = 0.7
     inference_instant_timeout: float = 120.0   # seconds
     
-    # Thinking tier — stronger, scale-to-zero (30B-70B models)
+    # Thinking tier — stronger, deeper reasoning
     inference_thinking_url: str = ""
-    inference_thinking_model: str = ""         # e.g. Qwen/Qwen2.5-72B-Instruct
+    inference_thinking_model: str = ""         # e.g. mlx-community/Qwen3-14B-4bit-AWQ
     inference_thinking_max_tokens: int = 4096
     inference_thinking_temperature: float = 0.5  # more focused for reasoning
     inference_thinking_timeout: float = 300.0    # 5 min — cold start + reasoning

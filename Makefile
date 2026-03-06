@@ -1,7 +1,7 @@
 # Local AI Assistant - Makefile
 # Run `make help` to see available commands
 
-.PHONY: help dev dev-gateway dev-webapp dev-supabase test test-gateway lint format clean install
+.PHONY: help dev dev-gateway dev-webapp dev-supabase test test-gateway lint format clean install mlx-instant mlx-thinking mlx-install
 
 # Default target
 help:
@@ -20,6 +20,10 @@ help:
 	@echo ""
 	@echo "  make lint           Run linters on gateway code"
 	@echo "  make format         Format gateway code with black"
+	@echo ""
+	@echo "  make mlx-install    Install mlx-lm on GPU machine"
+	@echo "  make mlx-instant    Start MLX instant server (Qwen3.5-9B, :8080)"
+	@echo "  make mlx-thinking   Start MLX thinking server (Qwen3-14B, :8081)"
 	@echo ""
 	@echo "  make clean          Remove build artifacts and caches"
 	@echo "  make stop           Stop all running services"
@@ -82,6 +86,22 @@ stop:
 	-cd supabase && supabase stop
 	-pkill -f "uvicorn app.main:app" 2>/dev/null || true
 	@echo "✅ Services stopped"
+
+# ──────────────────────────────────────────────────────────────
+# MLX INFERENCE SERVERS (run on GPU machine — M2 Pro)
+# ──────────────────────────────────────────────────────────────
+
+mlx-install:
+	@echo "📦 Installing mlx-lm..."
+	pip install mlx-lm
+
+mlx-instant:
+	@echo "⚡ Starting MLX instant server (Qwen3.5-9B) on :8080..."
+	mlx_lm.server --model mlx-community/Qwen3.5-9B-4bit --host 0.0.0.0 --port 8080
+
+mlx-thinking:
+	@echo "🧠 Starting MLX thinking server (Qwen3-14B) on :8081..."
+	mlx_lm.server --model mlx-community/Qwen3-14B-4bit-AWQ --host 0.0.0.0 --port 8081
 
 # ──────────────────────────────────────────────────────────────
 # TESTING
