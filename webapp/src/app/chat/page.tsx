@@ -13,12 +13,14 @@ import {
   type ChatMessage,
 } from "@/lib/gateway";
 import Sidebar from "./sidebar";
+import MessageBubble from "./MessageBubble";
 
 interface DisplayMessage {
   id: string;
-  role: string;
+  role: "user" | "assistant" | "system";
   content: string;
   mode_used?: string | null;
+  model_used?: string | null;
   streaming?: boolean;
 }
 
@@ -93,9 +95,10 @@ export default function ChatPage() {
         setMessages(
           msgs.map((m: ChatMessage) => ({
             id: m.id,
-            role: m.role,
+            role: m.role as DisplayMessage["role"],
             content: m.content,
             mode_used: m.mode_used,
+            model_used: m.model_used ?? null,
           }))
         );
       } catch (err) {
@@ -310,31 +313,14 @@ export default function ChatPage() {
           )}
 
           {messages.map((msg) => (
-            <div
+            <MessageBubble
               key={msg.id}
-              className={`flex ${
-                msg.role === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-[80%] px-3 py-2 text-sm ${
-                  msg.role === "user"
-                    ? "bg-[#0d1f0d] border border-[#00ff41]/20 text-[#00ff41]"
-                    : "bg-[#111111] border border-[#3a3a3a] text-[#b0b0b0]"
-                }`}
-              >
-                <div className="text-[10px] text-[#77bb88] mb-1">
-                  {msg.role === "user" ? "> you" : "> ai"}
-                  {msg.mode_used === "thinking" && " [think]"}
-                </div>
-                <div className="whitespace-pre-wrap break-words">
-                  {msg.content}
-                  {msg.streaming && (
-                    <span className="inline-block w-2 h-4 bg-[#00ff41] ml-0.5 animate-pulse" />
-                  )}
-                </div>
-              </div>
-            </div>
+              role={msg.role}
+              content={msg.content}
+              streaming={msg.streaming}
+              mode={msg.mode_used}
+              model={msg.model_used}
+            />
           ))}
           <div ref={messagesEndRef} />
         </div>

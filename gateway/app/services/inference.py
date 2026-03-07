@@ -268,15 +268,17 @@ class InferenceService:
         """
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
+                payload: Dict[str, Any] = {
+                    "model": model,
+                    "messages": messages,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    "stream": False,
+                    "enable_thinking": mode == "thinking",
+                }
                 response = await client.post(
                     f"{endpoint}{api_prefix}/chat/completions",
-                    json={
-                        "model": model,
-                        "messages": messages,
-                        "max_tokens": max_tokens,
-                        "temperature": temperature,
-                        "stream": False,
-                    },
+                    json=payload,
                     headers={"Content-Type": "application/json"},
                 )
                 response.raise_for_status()
@@ -382,6 +384,7 @@ class InferenceService:
                         "max_tokens": resolved_max_tokens,
                         "temperature": resolved_temperature,
                         "stream": True,
+                        "enable_thinking": mode == "thinking",
                     },
                     headers={"Content-Type": "application/json"},
                 ) as response:
@@ -421,6 +424,7 @@ class InferenceService:
                                     else self._get_temperature("instant")
                                 ),
                                 "stream": True,
+                                "enable_thinking": False,
                             },
                             headers={"Content-Type": "application/json"},
                         ) as response:

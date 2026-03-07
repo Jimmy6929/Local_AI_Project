@@ -25,6 +25,7 @@ export interface ChatMessage {
   role: string;
   content: string;
   mode_used: string | null;
+  model_used?: string | null;
   created_at: string;
 }
 

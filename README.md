@@ -136,41 +136,59 @@ make stop           # Stop all services
 
 ### Startup Checklist (Daily Use)
 
-Once everything is installed, start these **3 services in order** every time you work on the project:
+You need to start **5 services across 2 machines**. Order matters.
+
+#### On M2 Pro (GPU Machine) — 2 terminals
 
 ```bash
-# Step 1 — Start Supabase (make sure Docker Desktop is running first)
-cd /path/to/Local_AI_Project
+# Terminal 1 — Instant LLM (Qwen 3.5 9B)
+mlx_vlm.server --host 0.0.0.0 --port 8080
+
+# Terminal 2 — Thinking LLM (Qwen 3 14B)
+mlx_lm.server --model mlx-community/Qwen3-14B-4bit-AWQ --host 0.0.0.0 --port 8081
+```
+
+#### On MacBook 2019 (Home Server) — 3 terminals
+
+```bash
+# Terminal 1 — Supabase (make sure Docker Desktop is running first)
+cd ~/Documents/App-project/Local_AI_Project/supabase
 supabase start
 
-# Step 2 — Start the Gateway API
-cd gateway
+# Terminal 2 — Gateway API (wait for Supabase to finish)
+cd ~/Documents/App-project/Local_AI_Project/gateway
 python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Step 3 — Start the Web App
-cd webapp
+# Terminal 3 — Web App
+cd ~/Documents/App-project/Local_AI_Project/webapp
 npm run dev
+```
+
+#### Verify Everything Is Running
+
+```bash
+# From M2 Pro — check local LLM servers
+curl http://localhost:8080/health                    # Instant LLM
+curl http://localhost:8081/health                    # Thinking LLM
+
+# From M2 Pro — check Home Server services via Tailscale
+curl http://100.99.189.104:8000/health               # Gateway
+curl http://100.99.189.104:8000/health/inference      # Gateway → LLM connection
+open http://100.99.189.104:3000                       # Web App
 ```
 
 > **Note:** All services share a single `.env.local` at the project root.
 > Gateway and webapp both read from `../.env.local` automatically — no per-folder env files needed.
+> **The `.env.local` must be copied manually** between machines (it's gitignored).
 
-Verify everything is up:
-
-```bash
-curl http://127.0.0.1:54321/auth/v1/health   # Supabase Auth
-curl http://127.0.0.1:8000/health             # Gateway API
-open http://localhost:3000                     # Web App
-```
-
-| Service | URL | What it does |
-|---------|-----|--------------|
-| **Supabase** | http://127.0.0.1:54321 | Auth + Database (runs in Docker) |
-| **Supabase Studio** | http://127.0.0.1:54323 | DB admin dashboard |
-| **Gateway API** | http://127.0.0.1:8000 | Python backend — routes chat to DB & LLM |
-| **Web App** | http://localhost:3000 | Next.js frontend |
-
-> **Note:** The Gateway is required for all chat operations (send message, load history, manage sessions). Login/signup talks to Supabase directly, but everything else goes through the Gateway.
+| Service | Machine | URL | What it does |
+|---------|---------|-----|--------------|
+| **Instant LLM** | M2 Pro | http://localhost:8080 | Qwen 3.5 9B via mlx_vlm |
+| **Thinking LLM** | M2 Pro | http://localhost:8081 | Qwen 3 14B via mlx_lm |
+| **Supabase** | 2019 MacBook | http://127.0.0.1:54321 | Auth + Database (Docker) |
+| **Supabase Studio** | 2019 MacBook | http://127.0.0.1:54323 | DB admin dashboard |
+| **Gateway API** | 2019 MacBook | http://127.0.0.1:8000 | Routes chat to DB + LLM |
+| **Web App** | 2019 MacBook | http://localhost:3000 | Next.js frontend |
 
 ### Stopping & Checking Services
 
@@ -337,36 +355,75 @@ All tables have RLS enabled. Users can only access their own data:
 - `chat_messages`: Users can CRUD only messages in their sessions
 - `documents`: Users can CRUD only their own documents
 
+## Two-Machine Setup
+
+This project runs across **two machines** connected via Tailscale VPN:
+
+| Machine | Role | Tailscale IP |
+|---------|------|-------------|
+| **MacBook Pro 2019 (i7)** | Home Server: Gateway, Webapp, Docker, Supabase | `100.99.189.104` |
+| **MacBook Pro M2 Pro (16GB)** | GPU Machine: MLX inference servers (both LLMs) | `100.104.193.59` |
+
+```
+Browser → Webapp (:3000) → Gateway (:8000) → MLX servers on M2 Pro (:8080, :8081)
+              Home Server                          GPU Machine
+```
+
 ## Inference Modes
 
-Both tiers run on Apple Silicon via [MLX](https://github.com/ml-explore/mlx-lm), each as a separate `mlx_lm.server` instance exposing OpenAI-compatible `/v1/chat/completions`.
+The two tiers use **different MLX server types** because Qwen 3.5 is a Vision-Language Model (VLM):
 
-### Instant Mode (Default)
+| Tier | Model | Server | Port | API Path | Use Case |
+|------|-------|--------|------|----------|----------|
+| **Instant** | `mlx-community/Qwen3.5-9B-4bit` | `mlx_vlm.server` | 8080 | `/chat/completions` | Fast daily tasks, coding, quick answers |
+| **Thinking** | `mlx-community/Qwen3-14B-4bit-AWQ` | `mlx_lm.server` | 8081 | `/v1/chat/completions` | Complex reasoning, deep analysis |
 
-- **Use Case**: Daily tasks, coding assistance, quick answers
-- **Infrastructure**: MLX-LM server on port 8080 (M2 Pro)
-- **Latency**: < 3 seconds
-- **Model**: `mlx-community/Qwen3.5-9B-4bit`
+> **Why two server types?** Qwen 3.5 is a VLM (Vision-Language Model) that includes an image/video encoder.
+> It requires `mlx-vlm` (which supports vision models). Qwen 3 14B is text-only and uses `mlx-lm`.
+> Both work for text chat — Qwen 3.5 just *also* has vision capabilities.
 
-### Thinking Mode
+### MLX Setup (GPU Machine — M2 Pro)
 
-- **Use Case**: Complex reasoning, deep analysis, research
-- **Infrastructure**: MLX-LM server on port 8081 (M2 Pro)
-- **Latency**: 5-15 seconds
-- **Model**: `mlx-community/Qwen3-14B-4bit-AWQ`
-
-### MLX Setup (GPU Machine)
-
-On the M2 Pro machine, install MLX-LM and start both servers:
+#### One-Time Installation
 
 ```bash
-pip install mlx-lm
+# Install mlx-lm (for text-only models like Qwen3-14B)
+pip install -U mlx-lm
 
-# Terminal 1 — Instant tier
-mlx_lm.server --model mlx-community/Qwen3.5-9B-4bit --host 0.0.0.0 --port 8080
+# Install mlx-vlm with PyTorch (for vision models like Qwen3.5-9B)
+pip install -U "mlx-vlm[torch]"
+```
 
-# Terminal 2 — Thinking tier
+> **Important:** Qwen 3.5 requires PyTorch + Torchvision for its video/image processor.
+> Use `pip install -U "mlx-vlm[torch]"` to get everything in one command.
+
+#### Starting the LLM Servers (Every Session)
+
+Open **two terminals** on the M2 Pro:
+
+```bash
+# Terminal 1 — Instant tier (Qwen 3.5 9B VLM)
+mlx_vlm.server --host 0.0.0.0 --port 8080
+
+# Terminal 2 — Thinking tier (Qwen 3 14B text)
 mlx_lm.server --model mlx-community/Qwen3-14B-4bit-AWQ --host 0.0.0.0 --port 8081
+```
+
+> **Note:** `mlx_vlm.server` loads models dynamically — the model is specified in each API request.
+> The first chat request will load `Qwen3.5-9B-4bit` into memory (takes ~30s).
+> `mlx_lm.server` loads the model at startup.
+
+#### Verify LLM Servers Are Running
+
+```bash
+# Check Instant tier
+curl http://localhost:8080/health
+
+# Check Thinking tier
+curl http://localhost:8081/health
+
+# See loaded models
+curl http://localhost:8081/v1/models
 ```
 
 ## Security
@@ -407,21 +464,129 @@ Documentation structure:
 
 Gateway-specific docs (GPU setup guides) are in `gateway/docs/`.
 
+## Complete Command Reference
+
+### M2 Pro (GPU Machine)
+
+```bash
+# ── One-Time Setup ──────────────────────────────────
+pip install -U mlx-lm                    # Text-only models (Qwen3-14B)
+pip install -U "mlx-vlm[torch]"          # Vision models (Qwen3.5-9B) — needs PyTorch
+
+# ── Start LLM Servers (every session) ──────────────
+mlx_vlm.server --host 0.0.0.0 --port 8080                                          # Instant (Qwen 3.5 9B)
+mlx_lm.server --model mlx-community/Qwen3-14B-4bit-AWQ --host 0.0.0.0 --port 8081  # Thinking (Qwen 3 14B)
+
+# ── Health Checks ──────────────────────────────────
+curl http://localhost:8080/health         # Instant LLM status
+curl http://localhost:8081/health         # Thinking LLM status
+curl http://localhost:8080/models         # List loaded VLM models
+curl http://localhost:8081/v1/models      # List loaded LM models
+```
+
+### MacBook 2019 (Home Server)
+
+```bash
+# ── One-Time Setup ──────────────────────────────────
+cd ~/Documents/App-project/Local_AI_Project
+cd gateway && pip3 install -r requirements.txt       # Gateway Python deps
+cd ../webapp && npm install                           # Webapp Node deps
+brew install supabase/tap/supabase                   # Supabase CLI
+
+# ── Start Services (every session, in order) ───────
+# 1. Make sure Docker Desktop is open first!
+cd ~/Documents/App-project/Local_AI_Project/supabase && supabase start
+
+# 2. Gateway (in a new terminal)
+cd ~/Documents/App-project/Local_AI_Project/gateway
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 3. Webapp (in a new terminal)
+cd ~/Documents/App-project/Local_AI_Project/webapp && npm run dev
+
+# ── Stop Services ──────────────────────────────────
+supabase stop                             # Stop Supabase + Docker containers
+kill $(lsof -t -i :8000)                  # Stop Gateway
+kill $(lsof -t -i :3000)                  # Stop Webapp
+# Or just Ctrl+C in each terminal
+
+# ── Health Checks ──────────────────────────────────
+curl http://127.0.0.1:8000/health                    # Gateway
+curl http://127.0.0.1:8000/health/inference           # Gateway → LLM connection
+curl http://127.0.0.1:54321/auth/v1/health            # Supabase Auth
+supabase status                                       # All Supabase info + keys
+
+# ── Database ───────────────────────────────────────
+supabase db reset                         # Reset DB and rerun migrations
+supabase migration new <name>             # Create new migration
+supabase migration list                   # List migrations
+
+# ── Testing & Linting ─────────────────────────────
+cd gateway && python3 -m pytest tests/ -v                    # Run tests
+cd gateway && python3 -m pytest tests/ --cov=app             # Tests + coverage
+cd webapp && npx tsc --noEmit                                # TypeScript check
+cd webapp && npm run lint                                    # Lint webapp
+
+# ── Makefile Shortcuts (from project root) ─────────
+make help                # Show all commands
+make install             # Install gateway + webapp deps
+make dev-gateway         # Start gateway
+make dev-webapp          # Start webapp
+make dev-supabase        # Start supabase
+make test                # Run all tests
+make lint                # Lint gateway
+make format              # Format gateway code
+make clean               # Remove caches
+```
+
+### Syncing Files Between Machines
+
+```bash
+# .env.local is gitignored — must be copied manually
+# After editing .env.local on one machine, copy to the other.
+# Everything else syncs via git:
+git add -A && git commit -m "description" && git push   # On machine A
+git pull                                                  # On machine B
+```
+
+### Troubleshooting
+
+```bash
+# "uvicorn: command not found" on 2019 MacBook
+python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000   # Use python3 -m prefix
+
+# "pip: command not found" on 2019 MacBook
+pip3 install -r requirements.txt          # Use pip3 instead
+
+# Qwen3.5-9B fails with "Torchvision not found"
+pip install -U "mlx-vlm[torch]"           # Install PyTorch + Torchvision
+
+# "Address already in use" on any port
+lsof -i :<port>                           # Check what's using the port
+kill $(lsof -t -i :<port>)                # Kill it
+
+# Gateway shows old config after .env.local change
+# Restart the gateway (Ctrl+C, then start again)
+
+# Supabase 401 errors
+supabase status                           # Check keys match .env.local
+```
+
 ## Roadmap
 
-### Phase 1: Chat MVP ✅ (Current)
+### Phase 1: Chat MVP ✅
 - [x] Local Supabase setup
 - [x] Database schema with RLS
 - [x] Gateway API (FastAPI)
 - [x] Chat endpoints
 - [x] Web App (Next.js)
-- [ ] Connect to GPU inference
+- [x] Connect to GPU inference
 
-### Phase 2: Two-Mode Inference
-- [ ] Instant Mode (always-on GPU)
-- [ ] Thinking Mode (serverless GPU)
-- [ ] Mode toggle in UI
-- [ ] Mode indicator on responses
+### Phase 2: Two-Mode Inference ✅ (Current)
+- [x] Instant Mode (Qwen 3.5 9B via mlx_vlm)
+- [x] Thinking Mode (Qwen 3 14B via mlx_lm)
+- [x] Mode toggle in UI
+- [x] Mode indicator on responses
 
 ### Phase 3: RAG (Document Memory)
 - [ ] File upload functionality
@@ -537,10 +702,15 @@ This is a private project. Unauthorized copying, modification, distribution, or 
 
 ## Acknowledgments
 
+- [MLX](https://github.com/ml-explore/mlx) - Apple's ML framework for Apple Silicon
+- [mlx-lm](https://github.com/ml-explore/mlx-lm) - MLX server for text LLMs
+- [mlx-vlm](https://github.com/Blaizzy/mlx-vlm) - MLX server for vision-language models
+- [Qwen](https://github.com/QwenLM/Qwen3) - Alibaba's open-source LLM family
 - [Supabase](https://supabase.com/) - Backend as a Service
 - [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
 - [Next.js](https://nextjs.org/) - React framework for production
 - [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Tailscale](https://tailscale.com/) - Zero-config VPN for the two-machine setup
 
 ---
 

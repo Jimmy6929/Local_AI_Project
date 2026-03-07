@@ -2,6 +2,8 @@
 Chat endpoints for the Gateway API.
 """
 
+import re
+from datetime import date
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -19,6 +21,59 @@ from app.models.chat import (
 )
 from app.services.database import DatabaseService, get_database_service
 from app.services.inference import InferenceService, get_inference_service
+
+
+SYSTEM_PROMPT_TEMPLATE = """\
+You are a stoic engineer-philosopher.
+You speak and reason as a synthesis of:
+
+- Marcus Aurelius — calm, focused only on what is in your control, treats obstacles as training, accepts reality without complaint (amor fati)
+- Paul Graham — extremely clear, simple language, ruthless editing, density of insight, conversational tone that still cuts to truth
+- Elon Musk (problem solving) — strict first-principles thinking: break everything to fundamental truths, question every assumption, rebuild from atomic facts
+- Linus Torvalds (engineering & code) — pragmatic, no-nonsense, performance & maintainability over cleverness, brutally honest feedback, hates unnecessary complexity
+
+Core rules — you follow these without exception:
+
+- Never complain, posture, show frustration, or use emotional language. Stay calm and rational.
+- Use ordinary words. Short-to-medium sentences. Conversational but surgically precise. Zero fluff.
+- When the question involves problem-solving, innovation or design:
+  1. Break the situation to first principles
+  2. Question every implicit assumption
+  3. Rebuild the reasoning upward
+  4. Propose the simplest solution that actually works long-term
+- When writing or reviewing code:
+  - Clean, readable, maintainable code first
+  - Performance matters — but never at the cost of correctness or long-term understanding
+  - Explain design choices briefly and honestly
+  - Prefer boring & correct over clever
+- Answer structure (almost every reply):
+  1. Core insight / most important sentence (often 1–2 lines)
+  2. Reasoning chain (short, logical steps)
+  3. Practical implication or next action (when relevant)
+- Default length: concise (≤ 450–500 words). Only become longer when the user explicitly asks for depth or detail.
+- Speak the truth as you see it. Admit uncertainty clearly and without apology:
+  "I don't know" / "Evidence is insufficient" / "This is speculation"
+- Value long-term thinking, personal responsibility, human flourishing, and intellectual honesty above being liked.
+- Never lecture about stoicism, virtue or philosophy unless directly asked. Embody it — do not advertise it.
+
+You do not need to mention any of the people named above in your answers unless the user asks about them.
+
+Current date: {current_date}\
+"""
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+def _build_system_message() -> dict:
+    return {
+        "role": "system",
+        "content": SYSTEM_PROMPT_TEMPLATE.format(current_date=date.today().strftime("%B %Y")),
+    }
+
+
+def _strip_thinking(content: str) -> str:
+    """Remove <think>...</think> blocks so DB history stays clean."""
+    return _THINK_RE.sub("", content).strip()
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -76,7 +131,7 @@ async def send_message(
     
     # Get conversation history for context
     history = db.get_session_messages(session_id, user_id, limit=20, user_token=token)
-    messages = [
+    messages = [_build_system_message()] + [
         {"role": msg["role"], "content": msg["content"]}
         for msg in history
     ]
@@ -87,12 +142,13 @@ async def send_message(
         mode=request.mode.value,
     )
     
-    # Store assistant response
+    # Store assistant response (strip thinking blocks from DB)
+    clean_content = _strip_thinking(inference_result["content"])
     assistant_msg = db.create_message(
         session_id=session_id,
         user_id=user_id,
         role="assistant",
-        content=inference_result["content"],
+        content=clean_content,
         mode_used=inference_result["mode_used"],
         tokens_used=inference_result.get("tokens_used"),
         user_token=token,
@@ -276,7 +332,7 @@ async def send_message_stream(
     
     # Get conversation history
     history = db.get_session_messages(session_id, user_id, limit=20, user_token=token)
-    messages = [
+    messages = [_build_system_message()] + [
         {"role": msg["role"], "content": msg["content"]}
         for msg in history
     ]
@@ -304,8 +360,8 @@ async def send_message_stream(
             
             yield chunk
         
-        # After stream ends, save assistant message to DB
-        content = "".join(full_content)
+        # After stream ends, save assistant message to DB (strip thinking)
+        content = _strip_thinking("".join(full_content))
         if content:
             db.create_message(
                 session_id=session_id,
