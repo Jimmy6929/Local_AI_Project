@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     inference_thinking_temperature: float = 0.5  # more focused for reasoning
     inference_thinking_timeout: float = 300.0    # 5 min — cold start + reasoning
     inference_thinking_enable_thinking: bool = True  # CoT reasoning for deep tier
+    inference_thinking_budget: int = 2048            # max tokens for the <think> block
     
     # Legacy / shared fallback (used when per-mode settings are empty)
     inference_model_name: str = "default"
@@ -112,6 +113,12 @@ class Settings(BaseSettings):
         if mode == "thinking":
             return self.inference_thinking_enable_thinking
         return self.inference_instant_enable_thinking
+    
+    def get_thinking_budget_for_mode(self, mode: str) -> int | None:
+        """Return the thinking token budget, or None for non-thinking modes."""
+        if mode == "thinking":
+            return self.inference_thinking_budget
+        return None
 
 
 @lru_cache

@@ -83,6 +83,10 @@ class InferenceService:
         """Get whether chain-of-thought is enabled for the given mode."""
         return self.settings.get_enable_thinking_for_mode(mode)
 
+    def _get_thinking_budget(self, mode: str) -> Optional[int]:
+        """Get the thinking token budget for the given mode, or None."""
+        return self.settings.get_thinking_budget_for_mode(mode)
+
     # ==================== Health Check ====================
 
     async def check_health(self, mode: str = "instant") -> Dict[str, Any]:
@@ -231,6 +235,7 @@ class InferenceService:
             timeout=self._get_timeout(mode),
             api_prefix=self._get_api_prefix(mode),
             enable_thinking=self._get_enable_thinking(mode),
+            thinking_budget=self._get_thinking_budget(mode),
         )
 
         # If thinking call failed and fallback is enabled, try instant
@@ -269,6 +274,7 @@ class InferenceService:
         timeout: float,
         api_prefix: str = "/v1",
         enable_thinking: bool = False,
+        thinking_budget: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Make the actual HTTP call to the inference endpoint.
@@ -284,6 +290,8 @@ class InferenceService:
                     "stream": False,
                     "enable_thinking": enable_thinking,
                 }
+                if thinking_budget is not None:
+                    payload["thinking_budget"] = thinking_budget
                 response = await client.post(
                     f"{endpoint}{api_prefix}/chat/completions",
                     json=payload,
@@ -377,24 +385,29 @@ class InferenceService:
 
         prefix = self._get_api_prefix(mode)
         resolved_enable_thinking = self._get_enable_thinking(mode)
+        resolved_thinking_budget = self._get_thinking_budget(mode)
 
         try:
             # Emit mode metadata as first event
             meta = {"mode": mode, "model": model, "fallback_used": fallback_used}
             yield f"data: {json.dumps({'metadata': meta})}\n\n"
 
+            stream_payload: Dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "max_tokens": resolved_max_tokens,
+                "temperature": resolved_temperature,
+                "stream": True,
+                "enable_thinking": resolved_enable_thinking,
+            }
+            if resolved_thinking_budget is not None:
+                stream_payload["thinking_budget"] = resolved_thinking_budget
+
             async with httpx.AsyncClient(timeout=resolved_timeout) as client:
                 async with client.stream(
                     "POST",
                     f"{endpoint}{prefix}/chat/completions",
-                    json={
-                        "model": model,
-                        "messages": messages,
-                        "max_tokens": resolved_max_tokens,
-                        "temperature": resolved_temperature,
-                        "stream": True,
-                        "enable_thinking": resolved_enable_thinking,
-                    },
+                    json=stream_payload,
                     headers={"Content-Type": "application/json"},
                 ) as response:
                     response.raise_for_status()

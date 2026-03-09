@@ -156,7 +156,32 @@ export async function sendMessageStream(
     onChunk(assembled);
   }
 
+  function stripThinkingTags(text: string): string {
+    const openIdx = text.indexOf("<think>");
+    const closeIdx = text.indexOf("</think>");
+    if (openIdx !== -1 && closeIdx !== -1) {
+      return (text.slice(0, openIdx) + text.slice(closeIdx + "</think>".length)).trim();
+    }
+    if (closeIdx !== -1) {
+      return text.slice(closeIdx + "</think>".length).trim();
+    }
+    if (openIdx !== -1) {
+      return text.slice(0, openIdx).trim();
+    }
+    return text;
+  }
+
   function synthesize(): string {
+    if (mode === "instant") {
+      let clean = rawContent;
+      const closeIdx = clean.indexOf("</think>");
+      if (closeIdx !== -1) {
+        clean = clean.slice(closeIdx + "</think>".length);
+      }
+      clean = stripThinkingTags(clean);
+      return clean.trimStart();
+    }
+
     // Format A: reasoning_content field present
     if (reasoningFieldUsed) {
       return (
