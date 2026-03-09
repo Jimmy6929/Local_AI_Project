@@ -292,6 +292,8 @@ class InferenceService:
                 }
                 if thinking_budget is not None:
                     payload["thinking_budget"] = thinking_budget
+                    payload["thinking_start_token"] = "<think>"
+                    payload["thinking_end_token"] = "</think>"
                 response = await client.post(
                     f"{endpoint}{api_prefix}/chat/completions",
                     json=payload,
@@ -402,6 +404,8 @@ class InferenceService:
             }
             if resolved_thinking_budget is not None:
                 stream_payload["thinking_budget"] = resolved_thinking_budget
+                stream_payload["thinking_start_token"] = "<think>"
+                stream_payload["thinking_end_token"] = "</think>"
 
             async with httpx.AsyncClient(timeout=resolved_timeout) as client:
                 async with client.stream(
