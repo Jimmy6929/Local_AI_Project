@@ -8,6 +8,7 @@ and work with any open-source model served via MLX, vLLM, TGI, etc.
 """
 
 from functools import lru_cache
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -114,7 +115,7 @@ class Settings(BaseSettings):
             return self.inference_thinking_enable_thinking
         return self.inference_instant_enable_thinking
     
-    def get_thinking_budget_for_mode(self, mode: str) -> int | None:
+    def get_thinking_budget_for_mode(self, mode: str) -> Optional[int]:
         """Return the thinking token budget, or None for non-thinking modes."""
         if mode == "thinking":
             return self.inference_thinking_budget
