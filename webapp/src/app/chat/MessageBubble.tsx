@@ -48,7 +48,6 @@ export default function MessageBubble({
   const [thinkOpen, setThinkOpen] = useState(false);
   const elapsed = useElapsedSeconds(streamStartedAt, streaming);
 
-  // Auto-expand while the model is actively thinking, collapse when done
   useEffect(() => {
     if (parsed.isThinking) {
       setThinkOpen(true);
@@ -62,53 +61,53 @@ export default function MessageBubble({
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[80%] text-sm ${
+        className={`max-w-[80%] text-sm rounded-2xl transition-all ${
           isUser
-            ? "bg-[#0d1f0d] border border-[#00ff41]/20 text-[#00ff41] px-3 py-2"
-            : "bg-[#111111] border border-[#3a3a3a] text-[#b0b0b0] px-3 py-2"
+            ? "bg-[#00ff41]/[0.1] text-[#00ff41] px-4 py-3"
+            : "glass-surface px-4 py-3 text-[#dddddd]"
         }`}
       >
-        {/* Role / mode label */}
-        <div className="text-[10px] text-[#77bb88] mb-1 flex items-center gap-2">
-          <span>{isUser ? "> you" : "> ai"}</span>
+        {/* Role label */}
+        <div className="text-[10px] text-[#aaa] mb-1.5 flex items-center gap-2">
+          <span className="font-medium">{isUser ? "You" : "AI"}</span>
           {mode && (
             <span
-              className={`px-1 ${
+              className={`px-1.5 py-0.5 rounded-md text-[9px] ${
                 mode === "thinking"
-                  ? "border border-[#ff9900]/40 text-[#ff9900]"
-                  : "border border-[#3a3a3a] text-[#77bb88]"
+                  ? "bg-[#ffbb33]/15 text-[#ffcc33]"
+                  : "bg-white/[0.06] text-[#aaa]"
               }`}
             >
-              {mode}
+              {mode === "thinking" ? "Think" : "Fast"}
             </span>
           )}
         </div>
 
-        {/* Thinking panel (assistant only) */}
+        {/* Thinking panel */}
         {!isUser && parsed.thinking && (
-          <div className="mb-2 border border-[#2a2a2a] bg-[#0a0a0a]">
+          <div className="mb-2 rounded-xl bg-black/30 overflow-hidden">
             <button
               onClick={() => setThinkOpen(!thinkOpen)}
-              className="w-full flex items-center gap-2 px-2 py-1 text-[10px] text-[#888] hover:text-[#aaa] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-[#aaa] hover:text-[#ccc] transition-colors"
             >
               <span
-                className={`transition-transform duration-200 ${
+                className={`transition-transform duration-200 text-[8px] ${
                   thinkOpen ? "rotate-90" : ""
                 }`}
               >
                 ▶
               </span>
               <span>
-                {parsed.isThinking ? "thinking" : "thought process"}
+                {parsed.isThinking ? "Thinking..." : "Thought process"}
               </span>
               {streamStartedAt && (
-                <span className={`ml-auto tabular-nums ${parsed.isThinking ? "text-[#ff9900]" : "text-[#555]"}`}>
+                <span className={`ml-auto tabular-nums ${parsed.isThinking ? "text-[#ffcc33]" : "text-[#888]"}`}>
                   {formatElapsed(elapsed)}
                 </span>
               )}
             </button>
             {thinkOpen && (
-              <div className="px-2 pb-2 text-[11px] text-[#777] whitespace-pre-wrap leading-relaxed border-t border-[#2a2a2a]">
+              <div className="px-3 pb-2.5 text-[11px] text-[#aaa] whitespace-pre-wrap leading-relaxed border-t border-white/[0.06]">
                 {parsed.thinking}
               </div>
             )}
@@ -120,7 +119,7 @@ export default function MessageBubble({
           <div className="whitespace-pre-wrap break-words">
             {content}
             {streaming && (
-              <span className="inline-block w-2 h-4 bg-[#00ff41] ml-0.5 animate-pulse" />
+              <span className="inline-block w-2 h-4 bg-[#00ff41] ml-0.5 animate-pulse rounded-sm" />
             )}
           </div>
         ) : (
@@ -141,8 +140,8 @@ export default function MessageBubble({
                           customStyle={{
                             margin: 0,
                             background: "#050505",
-                            border: "1px solid #3a3a3a",
-                            borderRadius: "4px",
+                            border: "1px solid rgba(255,255,255,0.06)",
+                            borderRadius: "12px",
                             fontSize: "0.85em",
                           }}
                         >
@@ -151,7 +150,7 @@ export default function MessageBubble({
                       );
                     }
                     return (
-                      <code className="bg-[#1a1a1a] px-1 py-0.5 text-[#e0e0e0] text-[0.85em]" {...props}>
+                      <code className="bg-white/[0.08] px-1.5 py-0.5 rounded-md text-[#f0f0f0] text-[0.85em]" {...props}>
                         {children}
                       </code>
                     );
@@ -162,15 +161,15 @@ export default function MessageBubble({
               </ReactMarkdown>
             ) : null}
             {streaming && (
-              <span className="inline-block w-2 h-4 bg-[#00ff41] ml-0.5 animate-pulse" />
+              <span className="inline-block w-2 h-4 bg-[#00ff41] ml-0.5 animate-pulse rounded-sm" />
             )}
           </div>
         )}
 
         {/* Elapsed time footer */}
         {!isUser && streamStartedAt && elapsed > 0 && (
-          <div className="text-[10px] text-[#555] mt-1.5 tabular-nums">
-            {streaming ? `generating · ${formatElapsed(elapsed)}` : `${formatElapsed(elapsed)}`}
+          <div className="text-[10px] text-[#999] mt-2 tabular-nums">
+            {streaming ? `Generating · ${formatElapsed(elapsed)}` : `${formatElapsed(elapsed)}`}
           </div>
         )}
       </div>

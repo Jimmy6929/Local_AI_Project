@@ -7,13 +7,16 @@
   --foreground-dim: #77bb88;
   --surface: #111111;
   --surface-hover: #1a1a1a;
-  --border: #3a3a3a;
+  --border: rgba(255, 255, 255, 0.06);
   --border-focus: #00ff41;
   --accent: #00ff41;
   --accent-dim: #003300;
   --danger: #ff3333;
-  --user-bg: #0d1f0d;
-  --assistant-bg: #111111;
+  --user-bg: rgba(13, 31, 13, 0.6);
+  --assistant-bg: rgba(17, 17, 17, 0.5);
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: 20px;
 }
 
 @theme inline {
@@ -25,7 +28,7 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3a3a3a #0a0a0a;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }
 
 body {
@@ -34,7 +37,31 @@ body {
   font-family: var(--font-mono), 'Courier New', monospace;
 }
 
-/* Hacker terminal cursor blink */
+/* ── Liquid Glass utilities ─────────────────────────── */
+
+.glass {
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-surface {
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background: rgba(17, 17, 17, 0.6);
+  border: 1px solid var(--glass-border);
+}
+
+.glass-accent {
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  background: rgba(0, 255, 65, 0.04);
+  border: 1px solid rgba(0, 255, 65, 0.1);
+}
+
+/* ── Terminal cursor blink ──────────────────────────── */
+
 @keyframes blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
@@ -46,23 +73,45 @@ body {
   color: var(--accent);
 }
 
-/* Scanline effect (subtle) */
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
+/* ── Glow effect ────────────────────────────────────── */
 
-/* Glow effect for active elements */
 .glow {
   text-shadow: 0 0 5px var(--accent), 0 0 10px var(--accent);
 }
 
-/* Input styling */
+/* ── Fade-in for scroll button and toasts ───────────── */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ── Input styling ──────────────────────────────────── */
+
 input, textarea {
   caret-color: var(--accent);
 }
 
-/* ── Markdown body inside assistant messages ─────────────── */
+/* ── Markdown body inside assistant messages ────────── */
 
 .markdown-body {
   line-height: 1.65;
@@ -84,7 +133,7 @@ input, textarea {
 .markdown-body h2,
 .markdown-body h3,
 .markdown-body h4 {
-  color: #d0d0d0;
+  color: #eeeeee;
   margin: 1em 0 0.4em;
   line-height: 1.3;
 }
@@ -104,19 +153,19 @@ input, textarea {
 }
 
 .markdown-body li::marker {
-  color: #555;
+  color: #999;
 }
 
 .markdown-body blockquote {
-  border-left: 2px solid #3a3a3a;
+  border-left: 2px solid rgba(255, 255, 255, 0.18);
   padding-left: 0.75em;
   margin: 0.5em 0;
-  color: #888;
+  color: #bbbbbb;
 }
 
 .markdown-body hr {
   border: none;
-  border-top: 1px solid #3a3a3a;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   margin: 1em 0;
 }
 
@@ -129,31 +178,32 @@ input, textarea {
 
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid #3a3a3a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0.35em 0.6em;
   text-align: left;
 }
 
 .markdown-body th {
-  background: #1a1a1a;
-  color: #b0b0b0;
+  background: rgba(255, 255, 255, 0.04);
+  color: #cccccc;
 }
 
 .markdown-body a {
-  color: #5599ff;
+  color: #77bbff;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .markdown-body strong {
-  color: #d0d0d0;
+  color: #f0f0f0;
 }
 
-/* Code blocks inside messages */
+/* ── Code blocks ────────────────────────────────────── */
+
 .markdown-body pre {
   background: #050505 !important;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
   padding: 12px;
   overflow-x: auto;
   margin: 0.5em 0;
@@ -161,8 +211,8 @@ input, textarea {
 
 pre {
   background: #050505 !important;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
   padding: 12px;
   overflow-x: auto;
 }

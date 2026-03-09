@@ -65,42 +65,40 @@ export default function Sidebar({
   }
 
   return (
-    <div className="w-64 border-r border-[#3a3a3a] flex flex-col min-h-screen bg-[#080808]">
+    <div className="w-64 flex flex-col min-h-screen bg-[#080808]/80 backdrop-blur-xl">
       {/* Header */}
-      <div className="p-3 border-b border-[#3a3a3a]">
-        <div className="text-xs text-[#00ff41] glow font-bold">
-          LOCAL_AI v0.1
-        </div>
+      <div className="p-4 pb-3">
+        <div className="text-[10px] text-[#999]">Local AI v0.1</div>
       </div>
 
       {/* New Chat */}
-      <div className="p-2">
+      <div className="px-3 pb-2">
         <button
           onClick={onNewChat}
-          className="w-full text-left text-xs px-2 py-2 border border-dashed border-[#3a3a3a] text-[#77bb88] hover:border-[#00ff41] hover:text-[#00ff41] transition-colors"
+          className="w-full text-left text-xs px-3 py-2.5 rounded-xl bg-[#00ff41]/[0.12] text-[#00ff41] hover:bg-[#00ff41]/[0.18] hover:text-[#33ff66] transition-all"
         >
-          + new_session
+          + New session
         </button>
       </div>
 
       {/* Sessions List */}
-      <div className="flex-1 overflow-y-auto px-2 space-y-1">
+      <div className="flex-1 overflow-y-auto px-3 space-y-1 py-1">
         {sessions.length === 0 && (
-          <div className="text-[10px] text-[#555555] p-2 text-center">
-            no sessions yet
+          <div className="text-[10px] text-[#999] p-3 text-center">
+            No sessions yet
           </div>
         )}
         {sessions.map((s) => (
           <div
             key={s.id}
-            className={`group flex items-center text-xs cursor-pointer transition-colors ${
+            className={`group flex items-center text-xs cursor-pointer transition-all rounded-xl ${
               activeSessionId === s.id
-                ? "bg-[#0d1f0d] border border-[#00ff41]/30 text-[#00ff41]"
-                : "border border-transparent text-[#77bb88] hover:text-[#00ff41] hover:bg-[#111111]"
+                ? "bg-[#00ff41]/[0.12] text-[#00ff41]"
+                : "text-[#aaa] hover:text-[#eee] hover:bg-white/[0.05]"
             }`}
           >
             {editingId === s.id ? (
-              <div className="flex-1 px-2 py-1.5">
+              <div className="flex-1 px-3 py-2">
                 <input
                   ref={editInputRef}
                   type="text"
@@ -111,46 +109,52 @@ export default function Sidebar({
                     if (e.key === "Escape") cancelRename();
                   }}
                   onBlur={commitRename}
-                  className="w-full bg-[#0a0a0a] border border-[#00ff41] text-[#00ff41] px-1 py-0.5 text-xs font-mono focus:outline-none"
+                  className="w-full bg-black/40 border border-[#00ff41]/30 text-[#00ff41] px-2 py-1 text-xs font-mono rounded-lg focus:outline-none focus:border-[#00ff41]/60"
                   maxLength={200}
                 />
-                <div className="text-[10px] text-[#555555] mt-0.5">
-                  enter to save · esc to cancel
+                <div className="text-[10px] text-[#888] mt-1">
+                  Enter to save · Esc to cancel
                 </div>
               </div>
             ) : (
               <button
                 onClick={() => onSelectSession(s.id)}
                 onDoubleClick={() => startRename(s)}
-                className="flex-1 text-left px-2 py-2 min-w-0"
+                className="flex-1 text-left px-3 py-2.5 min-w-0"
               >
-                <div className="truncate">{s.title || "untitled"}</div>
-                <div className="text-[10px] text-[#555555] mt-0.5">
+                <div className="truncate">{s.title || "Untitled"}</div>
+                <div className="text-[10px] text-[#888] mt-0.5">
                   {timeAgo(s.updated_at)}
                 </div>
               </button>
             )}
             {editingId !== s.id && (
-              <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex opacity-0 group-hover:opacity-100 transition-opacity pr-1">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     startRename(s);
                   }}
-                  className="px-1 text-[#555555] hover:text-[#00ff41]"
-                  title="rename session"
+                  className="p-1 text-[#888] hover:text-[#00ff41] rounded-lg hover:bg-white/[0.06] transition-all"
+                  title="Rename"
                 >
-                  [r]
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                  </svg>
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteSession(s.id);
                   }}
-                  className="px-1 text-[#555555] hover:text-[#ff3333]"
-                  title="delete session"
+                  className="p-1 text-[#888] hover:text-[#ff5555] rounded-lg hover:bg-[#ff5555]/[0.08] transition-all"
+                  title="Delete"
                 >
-                  [x]
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
                 </button>
               </div>
             )}
@@ -159,15 +163,15 @@ export default function Sidebar({
       </div>
 
       {/* User Info */}
-      <div className="border-t border-[#3a3a3a] p-3 space-y-2">
-        <div className="text-[10px] text-[#555555] truncate">
+      <div className="p-4 space-y-2">
+        <div className="text-[10px] text-[#999] truncate">
           {userEmail}
         </div>
         <button
           onClick={onLogout}
-          className="text-[10px] text-[#77bb88] hover:text-[#ff3333] transition-colors"
+          className="text-[10px] text-[#aaa] hover:text-[#ff5555] transition-colors"
         >
-          [logout]
+          Sign out
         </button>
       </div>
     </div>

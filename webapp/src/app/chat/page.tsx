@@ -36,14 +36,18 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"instant" | "thinking">("thinking");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showImageToast, setShowImageToast] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isStreamingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const userScrolledUpRef = useRef(false);
 
-  // Auth check
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -68,7 +72,6 @@ export default function ChatPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  // Load sessions
   const loadSessions = useCallback(async () => {
     if (!token) return;
     try {
@@ -83,14 +86,11 @@ export default function ChatPage() {
     loadSessions();
   }, [loadSessions]);
 
-  // Load messages when active session changes
   useEffect(() => {
     if (!token || !activeSessionId) {
       setMessages([]);
       return;
     }
-
-    // Don't reload from DB while streaming — the stream handler manages state
     if (isStreamingRef.current) return;
 
     async function loadMessages() {
@@ -112,14 +112,12 @@ export default function ChatPage() {
     loadMessages();
   }, [token, activeSessionId]);
 
-  // Smart auto-scroll: only scroll down if user hasn't scrolled up
   useEffect(() => {
     if (!userScrolledUpRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  // Track whether the user has scrolled away from the bottom
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -127,12 +125,18 @@ export default function ChatPage() {
       const el = container!;
       const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
       userScrolledUpRef.current = !atBottom;
+      setShowScrollBtn(!atBottom);
     }
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Send message
+  function scrollToBottom() {
+    userScrolledUpRef.current = false;
+    setShowScrollBtn(false);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
   async function handleSend() {
     if (!input.trim() || !token || loading) return;
 
@@ -140,6 +144,7 @@ export default function ChatPage() {
     setInput("");
     setLoading(true);
     userScrolledUpRef.current = false;
+    setShowScrollBtn(false);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -217,19 +222,16 @@ export default function ChatPage() {
     }
   }
 
-  // Stop generation
   function handleStop() {
     abortControllerRef.current?.abort();
   }
 
-  // New chat
   function handleNewChat() {
     setActiveSessionId(null);
     setMessages([]);
     inputRef.current?.focus();
   }
 
-  // Delete session
   async function handleDeleteSession(id: string) {
     if (!token) return;
     try {
@@ -244,7 +246,6 @@ export default function ChatPage() {
     }
   }
 
-  // Rename session
   async function handleRenameSession(id: string, title: string) {
     if (!token) return;
     try {
@@ -255,14 +256,12 @@ export default function ChatPage() {
     }
   }
 
-  // Logout
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace("/login");
   }
 
-  // Handle key press
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -270,16 +269,33 @@ export default function ChatPage() {
     }
   }
 
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    const url = URL.createObjectURL(file);
+    setImagePreview(url);
+    setShowImageToast(true);
+    setTimeout(() => setShowImageToast(false), 3000);
+  }
+
+  function removeImage() {
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="glow">authenticating...</div>
+        <div className="glow text-sm">authenticating...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-[#0a0a0a]">
       {/* Sidebar */}
       {sidebarOpen && (
         <Sidebar
@@ -295,55 +311,33 @@ export default function ChatPage() {
       )}
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen relative">
         {/* Header */}
-        <header className="border-b border-[#3a3a3a] px-4 py-2 flex items-center justify-between shrink-0">
+        <header className="px-5 py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-[#77bb88] hover:text-[#00ff41] text-sm"
+              className="text-[#00ff41] hover:text-[#33ff66] transition-colors p-2 rounded-xl hover:bg-white/[0.06]"
             >
-              {sidebarOpen ? "[≡]" : "[≡]"}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
             </button>
-            <span className="text-xs text-[#77bb88]">
+            <span className="text-xs text-[#999]">
               {activeSessionId
-                ? `session:${activeSessionId.slice(0, 8)}...`
-                : "new_session"}
+                ? `${activeSessionId.slice(0, 8)}...`
+                : "New session"}
             </span>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Mode toggle */}
-            <button
-              onClick={() =>
-                setMode(mode === "instant" ? "thinking" : "instant")
-              }
-              className={`text-xs px-2 py-1 border transition-colors ${
-                mode === "thinking"
-                  ? "border-[#ff9900] text-[#ff9900] bg-[#ff9900]/10"
-                  : "border-[#3a3a3a] text-[#77bb88] hover:border-[#77bb88]"
-              }`}
-            >
-              {mode === "thinking" ? "[think]" : "[instant]"}
-            </button>
           </div>
         </header>
 
         {/* Messages */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center text-[#555555] space-y-2">
-                <pre className="text-xs leading-tight">
-{`
-  ┌─────────────────────────┐
-  │  ready for input...     │
-  │                         │
-  │  type a message below   │
-  │  to start a session     │
-  └─────────────────────────┘
-`}
-                </pre>
-              </div>
+              <div className="text-[#999] text-sm">What can I help you with?</div>
             </div>
           )}
 
@@ -361,49 +355,136 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
-        <div className="border-t border-[#3a3a3a] p-4 shrink-0">
-          <div className="flex gap-2 items-end max-w-4xl mx-auto">
-            <div className="text-[#77bb88] text-sm pt-2">{">"}</div>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="type your message..."
-              rows={1}
-              className="flex-1 bg-transparent text-[#00ff41] text-sm resize-none focus:outline-none placeholder-[#555555] min-h-[36px] max-h-[200px] py-2"
-              style={{
-                height: "auto",
-                overflow: "hidden",
-              }}
-              onInput={(e) => {
-                const t = e.target as HTMLTextAreaElement;
-                t.style.height = "auto";
-                t.style.height = t.scrollHeight + "px";
-              }}
-              disabled={loading}
-              autoFocus
-            />
-            {loading ? (
-              <button
-                onClick={handleStop}
-                className="text-sm px-3 py-2 border border-[#ff3333]/40 text-[#ff3333] hover:border-[#ff3333] hover:bg-[#ff3333]/10 transition-colors shrink-0"
-              >
-                [stop]
-              </button>
-            ) : (
-              <button
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="text-sm px-3 py-2 border border-[#3a3a3a] text-[#77bb88] hover:border-[#00ff41] hover:text-[#00ff41] transition-colors disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
-              >
-                [send]
-              </button>
-            )}
+        {/* Scroll to bottom button */}
+        {showScrollBtn && (
+          <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-10 animate-fade-in-up">
+            <button
+              onClick={scrollToBottom}
+              className="glass rounded-full p-2.5 text-[#00ff41] hover:text-[#33ff66] transition-all hover:scale-105 shadow-lg shadow-black/40"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
           </div>
-          <div className="text-[10px] text-[#555555] mt-1 text-center">
-            enter to send · shift+enter for new line
+        )}
+
+        {/* Image toast */}
+        {showImageToast && (
+          <div className="absolute bottom-36 left-1/2 -translate-x-1/2 z-20 animate-fade-in-up">
+            <div className="glass rounded-xl px-4 py-2 text-xs text-[#ffcc33]">
+              Image upload not yet connected to backend
+            </div>
+          </div>
+        )}
+
+        {/* Input Area - Floating glass bar */}
+        <div className="p-4 pb-5 shrink-0">
+          <div className="max-w-3xl mx-auto">
+            {/* Image preview */}
+            {imagePreview && (
+              <div className="mb-2 flex items-center gap-2 animate-fade-in">
+                <div className="relative group">
+                  <img
+                    src={imagePreview}
+                    alt="Selected"
+                    className="h-16 w-16 object-cover rounded-xl border border-white/[0.06]"
+                  />
+                  <button
+                    onClick={removeImage}
+                    className="absolute -top-1.5 -right-1.5 bg-[#ff3333] text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                </div>
+                <span className="text-[10px] text-[#999]">{imageFile?.name}</span>
+              </div>
+            )}
+
+            <div className="glass rounded-2xl p-2 flex items-end gap-2 transition-all">
+              {/* Image upload button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 rounded-xl text-[#999] hover:text-[#00ff41] hover:bg-white/[0.06] transition-all shrink-0"
+                title="Add image"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="4" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                </svg>
+              </button>
+
+              {/* Mode toggle pill */}
+              <button
+                onClick={() =>
+                  setMode(mode === "instant" ? "thinking" : "instant")
+                }
+                className={`text-[11px] px-3 py-1.5 rounded-xl transition-all shrink-0 ${
+                  mode === "thinking"
+                    ? "bg-[#ffbb33]/15 text-[#ffcc33] border border-[#ffbb33]/30"
+                    : "text-[#999] hover:text-[#00ff41] border border-white/[0.08] hover:border-white/[0.15]"
+                }`}
+              >
+                {mode === "thinking" ? "Think" : "Fast"}
+              </button>
+
+              {/* Text input */}
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Send a message..."
+                rows={1}
+                className="flex-1 bg-transparent text-[#f0f0f0] text-sm resize-none focus:outline-none placeholder-[#888] min-h-[36px] max-h-[200px] py-2 px-1"
+                style={{
+                  height: "auto",
+                  overflow: "hidden",
+                }}
+                onInput={(e) => {
+                  const t = e.target as HTMLTextAreaElement;
+                  t.style.height = "auto";
+                  t.style.height = t.scrollHeight + "px";
+                }}
+                disabled={loading}
+                autoFocus
+              />
+
+              {/* Send / Stop button */}
+              {loading ? (
+                <button
+                  onClick={handleStop}
+                  className="p-2 rounded-xl bg-[#ff5555]/15 text-[#ff5555] hover:bg-[#ff5555]/25 transition-all shrink-0"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className="p-2 rounded-xl text-[#00ff41] hover:bg-[#00ff41]/10 transition-all disabled:opacity-20 disabled:cursor-not-allowed shrink-0"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5" />
+                    <polyline points="5 12 12 5 19 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <div className="text-[10px] text-[#777] mt-2 text-center">
+              Enter to send · Shift+Enter for new line
+            </div>
           </div>
         </div>
       </div>
