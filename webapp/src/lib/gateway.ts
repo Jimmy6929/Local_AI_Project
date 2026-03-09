@@ -103,66 +103,109 @@ export async function sendMessageStream(
   if (!reader) throw new Error("No response body");
 
   const decoder = new TextDecoder();
-  let reasoning = "";
-  let content = "";
-  let reasoningDone = false;
+  let sseBuffer = "";
+
+  // Format A: server sends delta.reasoning_content (some API providers)
+  let reasoningField = "";
+  let reasoningFieldUsed = false;
+  let reasoningFieldDone = false;
+
+  // Format B/C: thinking in delta.content (mlx_vlm strips <think> to "")
+  let rawContent = "";
+  let firstContentSeen = false;
+  let firstContentWasEmpty = false;
+
+  function processLine(line: string) {
+    if (!line.startsWith("data: ") || line.includes("[DONE]")) return;
+
+    let data;
+    try {
+      data = JSON.parse(line.slice(6));
+    } catch {
+      return;
+    }
+
+    if (data.session_id && !data.choices) {
+      onSessionId(data.session_id);
+      return;
+    }
+
+    const delta = data.choices?.[0]?.delta;
+    if (!delta) return;
+
+    const rc = delta.reasoning_content;
+    const ct = delta.content;
+
+    if (rc) {
+      reasoningField += rc;
+      reasoningFieldUsed = true;
+    }
+
+    if (ct !== undefined && ct !== null) {
+      if (!firstContentSeen) {
+        firstContentSeen = true;
+        firstContentWasEmpty = ct === "";
+      }
+      if (ct) rawContent += ct;
+      if (reasoningFieldUsed && ct.length > 0 && !reasoningFieldDone) {
+        reasoningFieldDone = true;
+      }
+    }
+
+    const assembled = synthesize();
+    onChunk(assembled);
+  }
+
+  function synthesize(): string {
+    // Format A: reasoning_content field present
+    if (reasoningFieldUsed) {
+      return (
+        "<think>" +
+        reasoningField +
+        (reasoningFieldDone ? "</think>" : "") +
+        rawContent
+      );
+    }
+
+    // Format B: explicit <think> tags in content — pass through for parser
+    if (rawContent.includes("<think>")) {
+      return rawContent;
+    }
+
+    // Format C: mlx_vlm stripped <think> to "", but </think> appears literally
+    const closeIdx = rawContent.indexOf("</think>");
+
+    if (closeIdx !== -1 && firstContentWasEmpty) {
+      const thinkText = rawContent.slice(0, closeIdx).trim();
+      const respText = rawContent.slice(closeIdx + "</think>".length);
+      return (thinkText ? "<think>" + thinkText + "</think>" : "") + respText;
+    }
+
+    if (firstContentWasEmpty && rawContent.trim() && closeIdx === -1) {
+      return "<think>" + rawContent;
+    }
+
+    return rawContent;
+  }
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    const text = decoder.decode(value, { stream: true });
-    const lines = text.split("\n");
+    sseBuffer += decoder.decode(value, { stream: true });
+    const parts = sseBuffer.split("\n");
+    sseBuffer = parts.pop() || "";
 
-    for (const line of lines) {
-      if (line.startsWith("data: ") && !line.includes("[DONE]")) {
-        try {
-          const data = JSON.parse(line.slice(6));
-
-          if (data.session_id && !data.choices) {
-            onSessionId(data.session_id);
-            continue;
-          }
-
-          const delta = data.choices?.[0]?.delta;
-          if (!delta) continue;
-
-          const rc = delta.reasoning_content;
-          const ct = delta.content;
-
-          if (rc) {
-            reasoning += rc;
-          }
-
-          if (ct) {
-            if (reasoning && !reasoningDone) {
-              reasoningDone = true;
-            }
-            content += ct;
-          }
-
-          // Synthesize the combined text with <think> wrapper so the
-          // existing parseThinkingContent() in the UI can split them.
-          let assembled = "";
-          if (reasoning) {
-            assembled += "<think>" + reasoning + (reasoningDone ? "</think>" : "");
-          }
-          assembled += content;
-          onChunk(assembled);
-        } catch {
-          // skip parse errors
-        }
-      }
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed) processLine(trimmed);
     }
   }
 
+  if (sseBuffer.trim()) processLine(sseBuffer.trim());
+
   // Final assembled result
-  let result = "";
-  if (reasoning) {
-    result += "<think>" + reasoning + "</think>";
-  }
-  result += content;
-  return result;
+  return synthesize();
 }
 
 export async function listSessions(
