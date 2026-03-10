@@ -16,6 +16,7 @@ class ChatMode(str, Enum):
     """Inference mode for chat."""
     INSTANT = "instant"
     THINKING = "thinking"
+    THINKING_HARDER = "thinking_harder"
 
 
 class ChatRequest(BaseModel):

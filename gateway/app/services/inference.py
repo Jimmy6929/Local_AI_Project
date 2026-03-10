@@ -51,19 +51,19 @@ class InferenceService:
 
     def _get_endpoint(self, mode: str) -> Optional[str]:
         """Get the inference endpoint URL for the given mode."""
-        if mode == "thinking":
+        if mode in ("thinking", "thinking_harder"):
             return self.thinking_url
         return self.instant_url
 
     def _get_api_prefix(self, mode: str) -> str:
         """Get the API path prefix for the given mode ('' or '/v1')."""
-        if mode == "thinking":
+        if mode in ("thinking", "thinking_harder"):
             return self.thinking_api_prefix
         return self.instant_api_prefix
 
     def _get_model(self, mode: str) -> str:
         """Get the model name for the given mode."""
-        if mode == "thinking":
+        if mode in ("thinking", "thinking_harder"):
             return self.thinking_model
         return self.instant_model
 
@@ -153,7 +153,7 @@ class InferenceService:
                 "model": model,
                 "message": (
                     f"Cannot connect to {endpoint}. "
-                    + ("Serverless pod may be scaled to zero." if mode == "thinking"
+                    + ("Serverless pod may be scaled to zero." if mode in ("thinking", "thinking_harder")
                        else "Is the GPU pod running?")
                 ),
             }
@@ -200,7 +200,7 @@ class InferenceService:
 
         if not endpoint:
             # If thinking not configured, try fallback to instant
-            if mode == "thinking" and self.fallback_to_instant and self.instant_url:
+            if mode in ("thinking", "thinking_harder") and self.fallback_to_instant and self.instant_url:
                 print("[inference] Thinking endpoint not configured -- falling back to instant")
                 result = await self._call_endpoint(
                     endpoint=self.instant_url,
@@ -240,7 +240,7 @@ class InferenceService:
 
         # If thinking call failed and fallback is enabled, try instant
         if (result.get("_error")
-                and mode == "thinking"
+                and mode in ("thinking", "thinking_harder")
                 and self.fallback_to_instant
                 and self.instant_url):
             print("[inference] Thinking endpoint failed -- falling back to instant")
@@ -317,7 +317,7 @@ class InferenceService:
                     "fallback_used": False,
                 }
         except httpx.ConnectError:
-            ctx = "cold start?" if mode == "thinking" else "is pod running?"
+            ctx = "cold start?" if mode in ("thinking", "thinking_harder") else "is pod running?"
             print(f"[inference] Cannot connect to {endpoint} ({mode}) -- {ctx}")
             mock = await self._mock_response(messages, mode)
             mock["_error"] = "connect_error"
@@ -371,7 +371,7 @@ class InferenceService:
 
         # If endpoint not configured, try fallback or mock
         if not endpoint:
-            if mode == "thinking" and self.fallback_to_instant and self.instant_url:
+            if mode in ("thinking", "thinking_harder") and self.fallback_to_instant and self.instant_url:
                 endpoint = self.instant_url
                 model = self.instant_model
                 resolved_max_tokens = max_tokens or self._get_max_tokens("instant")
@@ -424,7 +424,7 @@ class InferenceService:
             print(f"[inference] Stream error ({error_context}): {e}")
 
             # If thinking failed, try fallback stream
-            if mode == "thinking" and self.fallback_to_instant and self.instant_url:
+            if mode in ("thinking", "thinking_harder") and self.fallback_to_instant and self.instant_url:
                 print("[inference] Falling back to instant stream")
                 fb_prefix = self._get_api_prefix("instant")
                 fallback_meta = {
@@ -477,7 +477,7 @@ class InferenceService:
         """Generate a mock response for testing when no endpoint is configured."""
         last_message = messages[-1]["content"] if messages else ""
 
-        mode_label = "Thinking" if mode == "thinking" else "Instant"
+        mode_label = "Thinking" if mode in ("thinking", "thinking_harder") else "Instant"
 
         if "hello" in last_message.lower() or "hi" in last_message.lower():
             content = "Hello! I'm your AI assistant. How can I help you today?"

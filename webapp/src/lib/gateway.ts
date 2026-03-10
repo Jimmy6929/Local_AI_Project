@@ -55,7 +55,7 @@ async function apiCall<T>(
 export async function sendMessage(
   token: string,
   message: string,
-  mode: "instant" | "thinking" = "instant",
+  mode: "instant" | "thinking" | "thinking_harder" = "instant",
   sessionId?: string
 ): Promise<ChatResponse> {
   return apiCall<ChatResponse>("/chat", token, {
@@ -71,7 +71,7 @@ export async function sendMessage(
 export async function sendMessageStream(
   token: string,
   message: string,
-  mode: "instant" | "thinking" = "instant",
+  mode: "instant" | "thinking" | "thinking_harder" = "instant",
   sessionId?: string,
   onChunk: (text: string) => void = () => {},
   onSessionId: (id: string) => void = () => {},

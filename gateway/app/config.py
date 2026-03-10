@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     inference_thinking_timeout: float = 300.0    # 5 min — cold start + reasoning
     inference_thinking_enable_thinking: bool = True  # CoT reasoning for deep tier
     inference_thinking_budget: int = 2048            # max tokens for the <think> block
+    inference_thinking_harder_max_tokens: int = 30720
+    inference_thinking_harder_budget: int = 16384
     
     # Legacy / shared fallback (used when per-mode settings are empty)
     inference_model_name: str = "default"
@@ -81,42 +83,46 @@ class Settings(BaseSettings):
     
     def get_api_prefix_for_mode(self, mode: str) -> str:
         """Return the API path prefix for the given mode ('/v1' or '')."""
-        if mode == "thinking":
+        if mode in ("thinking", "thinking_harder"):
             return self.inference_thinking_api_prefix
         return self.inference_instant_api_prefix
     
     def get_model_for_mode(self, mode: str) -> str:
         """Return the model name for the given mode, with fallback."""
-        if mode == "thinking":
+        if mode in ("thinking", "thinking_harder"):
             return self.inference_thinking_model or self.inference_model_name
         return self.inference_instant_model or self.inference_model_name
     
     def get_max_tokens_for_mode(self, mode: str) -> int:
         """Return max tokens for the given mode."""
+        if mode == "thinking_harder":
+            return self.inference_thinking_harder_max_tokens
         if mode == "thinking":
             return self.inference_thinking_max_tokens
         return self.inference_instant_max_tokens
     
     def get_temperature_for_mode(self, mode: str) -> float:
         """Return temperature for the given mode."""
-        if mode == "thinking":
+        if mode in ("thinking", "thinking_harder"):
             return self.inference_thinking_temperature
         return self.inference_instant_temperature
     
     def get_timeout_for_mode(self, mode: str) -> float:
         """Return timeout for the given mode."""
-        if mode == "thinking":
+        if mode in ("thinking", "thinking_harder"):
             return self.inference_thinking_timeout
         return self.inference_instant_timeout
     
     def get_enable_thinking_for_mode(self, mode: str) -> bool:
         """Return whether to enable chain-of-thought for the given mode."""
-        if mode == "thinking":
+        if mode in ("thinking", "thinking_harder"):
             return self.inference_thinking_enable_thinking
         return self.inference_instant_enable_thinking
     
     def get_thinking_budget_for_mode(self, mode: str) -> Optional[int]:
         """Return the thinking token budget, or None for non-thinking modes."""
+        if mode == "thinking_harder":
+            return self.inference_thinking_harder_budget
         if mode == "thinking":
             return self.inference_thinking_budget
         return None

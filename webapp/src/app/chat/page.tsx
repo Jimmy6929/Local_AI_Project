@@ -34,7 +34,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"instant" | "thinking">("thinking");
+  const [mode, setMode] = useState<"instant" | "thinking" | "thinking_harder">("thinking");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -466,13 +466,29 @@ export default function ChatPage() {
                   setMode(mode === "instant" ? "thinking" : "instant")
                 }
                 className={`text-[11px] px-3 py-1.5 rounded-xl transition-all shrink-0 ${
-                  mode === "thinking"
+                  mode !== "instant"
                     ? "bg-[#ffbb33]/15 text-[#ffcc33] border border-[#ffbb33]/30"
                     : "text-[#999] hover:text-[#00ff41] border border-white/[0.08] hover:border-white/[0.15]"
                 }`}
               >
-                {mode === "thinking" ? "Think" : "Fast"}
+                {mode === "instant" ? "Fast" : mode === "thinking_harder" ? "Think+" : "Think"}
               </button>
+
+              {/* Think harder sub-toggle */}
+              {mode !== "instant" && (
+                <button
+                  onClick={() =>
+                    setMode(mode === "thinking_harder" ? "thinking" : "thinking_harder")
+                  }
+                  className={`text-[11px] px-3 py-1.5 rounded-xl transition-all shrink-0 ${
+                    mode === "thinking_harder"
+                      ? "bg-[#ff8833]/20 text-[#ff9955] border border-[#ff8833]/40"
+                      : "text-[#ffcc33] border border-[#ffbb33]/30 hover:bg-[#ffbb33]/10"
+                  }`}
+                >
+                  {mode === "thinking_harder" ? "Think Harder" : "Normal"}
+                </button>
+              )}
 
               {/* Text input */}
               <textarea

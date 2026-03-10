@@ -73,12 +73,12 @@ export default function MessageBubble({
           {mode && (
             <span
               className={`px-1.5 py-0.5 rounded-md text-[9px] ${
-                mode === "thinking"
+                mode === "thinking" || mode === "thinking_harder"
                   ? "bg-[#ffbb33]/15 text-[#ffcc33]"
                   : "bg-white/[0.06] text-[#aaa]"
               }`}
             >
-              {mode === "thinking" ? "Think" : "Fast"}
+              {mode === "thinking_harder" ? "Think+" : mode === "thinking" ? "Think" : "Fast"}
             </span>
           )}
         </div>
