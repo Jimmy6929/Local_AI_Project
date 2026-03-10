@@ -55,14 +55,14 @@ class Settings(BaseSettings):
     inference_thinking_model: str = ""         # e.g. mlx-community/Qwen3.5-9B-4bit
     inference_thinking_api_prefix: str = ""    # "" for mlx_vlm, "/v1" for mlx_lm
     inference_thinking_max_tokens: int = 4096
-    inference_thinking_temperature: float = 0.5  # more focused for reasoning
+    inference_thinking_temperature: float = 0.6  # Qwen 3.5 recommended for thinking
     inference_thinking_top_p: float = 0.95
     inference_thinking_top_k: int = 20
     inference_thinking_timeout: float = 300.0    # 5 min — cold start + reasoning
     inference_thinking_enable_thinking: bool = True  # CoT reasoning for deep tier
     inference_thinking_budget: int = 2048            # max tokens for the <think> block
-    inference_thinking_harder_max_tokens: int = 30720
-    inference_thinking_harder_budget: int = 16384
+    inference_thinking_harder_max_tokens: int = 28672
+    inference_thinking_harder_budget: int = 8192
     
     # Legacy / shared fallback (used when per-mode settings are empty)
     inference_model_name: str = "default"

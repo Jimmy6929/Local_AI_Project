@@ -140,7 +140,12 @@ You need to start **4 services across 2 machines**. Order matters.
 
 ```bash
 # Terminal 1 — Thinking LLM (Qwen 3.5 9B)
-mlx_vlm.server --host 0.0.0.0 --port 8080
+mlx_vlm.server --host 0.0.0.0 --port 8080 \
+  --model mlx-community/Qwen3.5-9B-4bit \
+  --enable-thinking \
+  --thinking-budget 2048 \
+  --thinking-start-token "<think>" \
+  --thinking-end-token "</think>"
 ```
 
 #### On MacBook 2019 (Home Server) — 3 terminals
@@ -380,21 +385,40 @@ The thinking tier runs Qwen 3.5 9B via `mlx_vlm.server` with chain-of-thought re
 #### One-Time Installation
 
 ```bash
-# Install mlx-vlm with PyTorch (for Qwen 3.5 9B)
+# Install/upgrade mlx-vlm with PyTorch (for Qwen 3.5 9B)
 pip install -U "mlx-vlm[torch]"
 ```
 
 > **Important:** Qwen 3.5 requires PyTorch + Torchvision for its video/image processor.
 > Use `pip install -U "mlx-vlm[torch]"` to get everything in one command.
+>
+> **Thinking mode requires mlx-vlm >= March 5 2026** (PR #789). If you installed
+> before that date, run `pip install -U "mlx-vlm[torch]"` again to pick up
+> `--enable-thinking` and `--thinking-budget` server flags.
 
 #### Starting the LLM Server (Every Session)
 
 Open **one terminal** on the M2 Pro:
 
 ```bash
-# Thinking tier (Qwen 3.5 9B VLM)
-mlx_vlm.server --host 0.0.0.0 --port 8080
+# Thinking tier (Qwen 3.5 9B VLM) — thinking enabled by default
+mlx_vlm.server --host 0.0.0.0 --port 8080 \
+  --model mlx-community/Qwen3.5-9B-4bit \
+  --enable-thinking \
+  --thinking-budget 2048 \
+  --thinking-start-token "<think>" \
+  --thinking-end-token "</think>"
 ```
+
+| Flag | Purpose |
+|------|---------|
+| `--model` | Explicitly load Qwen 3.5 9B 4-bit instead of relying on cache |
+| `--enable-thinking` | Passes `enable_thinking=True` into Qwen's chat template |
+| `--thinking-budget 2048` | Server-side hard cap — forcibly closes `</think>` after 2048 tokens |
+| `--thinking-start-token` / `--thinking-end-token` | Tells the server which tokens delimit the reasoning block |
+
+> The gateway also sends per-request `thinking_budget` in the API body (2048 for Think, 8192 for Think Harder).
+> The server-side `--thinking-budget` acts as a safety net default.
 
 #### Verify LLM Server Is Running
 
@@ -450,7 +474,12 @@ Gateway-specific docs (GPU setup guides) are in `gateway/docs/`.
 pip install -U "mlx-vlm[torch]"          # Qwen 3.5 9B — needs PyTorch
 
 # ── Start LLM Server (every session) ───────────────
-mlx_vlm.server --host 0.0.0.0 --port 8080   # Thinking (Qwen 3.5 9B)
+mlx_vlm.server --host 0.0.0.0 --port 8080 \
+  --model mlx-community/Qwen3.5-9B-4bit \
+  --enable-thinking \
+  --thinking-budget 2048 \
+  --thinking-start-token "<think>" \
+  --thinking-end-token "</think>"
 
 # ── Health Checks ──────────────────────────────────
 curl http://localhost:8080/health         # Thinking LLM status
@@ -533,6 +562,10 @@ pip3 install -r requirements.txt          # Use pip3 instead
 
 # Qwen3.5-9B fails with "Torchvision not found"
 pip install -U "mlx-vlm[torch]"           # Install PyTorch + Torchvision
+
+# Thinking gets stuck in loops / socket.send() errors
+pip install -U "mlx-vlm[torch]"           # Upgrade — needs PR #789 (Mar 5 2026+)
+# Then restart the server WITH --enable-thinking and --thinking-budget flags
 
 # "Address already in use" on any port
 lsof -i :<port>                           # Check what's using the port
