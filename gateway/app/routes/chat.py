@@ -411,26 +411,20 @@ async def send_message_stream(
         if not reasoning:
             reasoning = None
 
-        if content:
-            db.create_message(
-                session_id=session_id,
-                user_id=user_id,
-                role="assistant",
-                content=content,
-                mode_used=request.mode.value,
-                reasoning_content=reasoning,
-                user_token=token,
-            )
-        elif not content and reasoning:
-            db.create_message(
-                session_id=session_id,
-                user_id=user_id,
-                role="assistant",
-                content="(no visible response)",
-                mode_used=request.mode.value,
-                reasoning_content=reasoning,
-                user_token=token,
-            )
+        save_content = content if content else ("(no visible response)" if reasoning else None)
+        if save_content:
+            try:
+                db.create_message(
+                    session_id=session_id,
+                    user_id=user_id,
+                    role="assistant",
+                    content=save_content,
+                    mode_used=request.mode.value,
+                    reasoning_content=reasoning,
+                    user_token=token,
+                )
+            except Exception as db_err:
+                print(f"[chat] Failed to save assistant message to DB: {db_err}")
     
     return StreamingResponse(
         event_generator(),

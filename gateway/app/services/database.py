@@ -32,6 +32,11 @@ class DatabaseService:
         
         with httpx.Client() as client:
             response = client.request(method, url, headers=headers, **kwargs)
+            if not response.is_success:
+                print(
+                    f"[database] {method} {endpoint} → {response.status_code}: "
+                    f"{response.text[:500]}"
+                )
             response.raise_for_status()
             if response.status_code == 204:
                 return None
