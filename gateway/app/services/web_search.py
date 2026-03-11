@@ -85,14 +85,20 @@ class WebSearchService:
             if not url or url in seen_urls:
                 continue
             seen_urls.add(url)
+            snippet = (item.get("content") or "").strip()
+            if not snippet:
+                continue
+            if len(snippet) > 300:
+                snippet = snippet[:300].rsplit(" ", 1)[0] + "..."
             results.append({
-                "title": item.get("title", ""),
+                "title": (item.get("title") or "Untitled").strip(),
                 "url": url,
-                "content": item.get("content", ""),
+                "content": snippet,
             })
             if len(results) >= limit:
                 break
 
+        print(f"[web_search] Found {len(results)} results for: {query[:80]}")
         return results
 
     def format_results_for_context(self, results: List[Dict[str, Any]]) -> str:

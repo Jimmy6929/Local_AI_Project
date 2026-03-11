@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     searxng_url: str = "http://localhost:8888"
     web_search_enabled: bool = True
     web_search_timeout: float = 5.0
-    web_search_max_results: int = 5
+    web_search_max_results: int = 3
 
     # Database URL (for direct connections if needed)
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"

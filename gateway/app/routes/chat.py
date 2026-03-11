@@ -205,10 +205,10 @@ async def send_message(
         search_results = await web_search.search(request.message)
         if search_results:
             context_text = web_search.format_results_for_context(search_results)
-            messages.insert(-1, {
-                "role": "system",
-                "content": f"Web search results for context:\n\n{context_text}",
-            })
+            messages[0]["content"] += f"\n\nWEB SEARCH RESULTS:\n{context_text}"
+
+    total_chars = sum(len(m.get("content", "")) for m in messages)
+    print(f"[chat] Sending {len(messages)} messages ({total_chars} chars) to inference")
 
     # Voice conversation always uses instant tier (Qwen 3.5 4B); config via INFERENCE_INSTANT_*
     inference_mode = "instant" if request.conversation_mode else request.mode.value
@@ -426,11 +426,11 @@ async def send_message_stream(
         search_results = await web_search.search(request.message)
         if search_results:
             context_text = web_search.format_results_for_context(search_results)
-            messages.insert(-1, {
-                "role": "system",
-                "content": f"Web search results for context:\n\n{context_text}",
-            })
-    
+            messages[0]["content"] += f"\n\nWEB SEARCH RESULTS:\n{context_text}"
+
+    total_chars = sum(len(m.get("content", "")) for m in messages)
+    print(f"[chat] Sending {len(messages)} messages ({total_chars} chars) to inference")
+
     # Voice conversation always uses instant tier (Qwen 3.5 4B); config via INFERENCE_INSTANT_*
     inference_mode = "instant" if request.conversation_mode else request.mode.value
 
