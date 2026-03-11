@@ -47,6 +47,8 @@ const STOP_PHRASES = [
   "bye bye",
   "that's all",
   "stop talking",
+  "end chat",
+  "quit",
 ];
 
 export function isStopCommand(text: string): boolean {
@@ -54,7 +56,7 @@ export function isStopCommand(text: string): boolean {
   return STOP_PHRASES.includes(normalized);
 }
 
-const WAKE_PHRASES = ["hey alfred", "hello alfred", "hi alfred"];
+const WAKE_PHRASES = ["hey alfred", "hello alfred", "hi alfred", "alfred"];
 
 export function extractWakeCommand(transcript: string): {
   isWakeWord: boolean;
@@ -62,7 +64,7 @@ export function extractWakeCommand(transcript: string): {
 } {
   const lower = transcript.toLowerCase().trim();
   for (const phrase of WAKE_PHRASES) {
-    if (lower.startsWith(phrase)) {
+    if (lower === phrase || lower.startsWith(phrase + " ") || lower.startsWith(phrase + ",")) {
       const command = transcript
         .slice(phrase.length)
         .replace(/^[,.\s]+/, "")
@@ -92,7 +94,7 @@ function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .filter((s) => s.length > 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,15 +133,17 @@ export function useVoiceSettings() {
 
 // ---------------------------------------------------------------------------
 // Silence detection helper
+// startDelay: don't fire for first N ms — gives the user time to start speaking
 // ---------------------------------------------------------------------------
 
-function createSilenceDetector(
+export function createSilenceDetector(
   stream: MediaStream,
   onSilence: () => void,
-  opts?: { threshold?: number; duration?: number }
+  opts?: { threshold?: number; duration?: number; startDelay?: number }
 ) {
-  const threshold = opts?.threshold ?? 12;
+  const threshold = opts?.threshold ?? 15;
   const duration = opts?.duration ?? 2000;
+  const startDelay = opts?.startDelay ?? 2000; // 2s before silence can fire
 
   const ctx = new AudioContext();
   const source = ctx.createMediaStreamSource(stream);
@@ -151,9 +155,17 @@ function createSilenceDetector(
   let silenceStart: number | null = null;
   let raf: number | null = null;
   let stopped = false;
+  const startTime = Date.now();
 
   function check() {
     if (stopped) return;
+
+    // Don't allow silence to trigger in the first startDelay ms
+    if (Date.now() - startTime < startDelay) {
+      raf = requestAnimationFrame(check);
+      return;
+    }
+
     analyser.getByteFrequencyData(buf);
     const avg = buf.reduce((s, v) => s + v, 0) / buf.length;
 
@@ -180,7 +192,7 @@ function createSilenceDetector(
 }
 
 // ---------------------------------------------------------------------------
-// Speech-to-Text via MediaRecorder + backend Whisper + silence detection
+// Speech-to-Text via MediaRecorder + backend Whisper
 // ---------------------------------------------------------------------------
 
 export function useSpeechRecognition(options?: {
@@ -266,10 +278,7 @@ export function useSpeechRecognition(options?: {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         chunksRef.current = [];
 
-        if (blob.size === 0) {
-          setError("No audio recorded");
-          return;
-        }
+        if (blob.size === 0) return;
 
         const token = tokenRef.current;
         if (!token) {
@@ -284,11 +293,8 @@ export function useSpeechRecognition(options?: {
             blob,
             verifySpeakerRef.current
           );
-          if (
-            verifySpeakerRef.current &&
-            result.speaker_verified === false
-          ) {
-            // Not the enrolled speaker — silently ignore
+          if (verifySpeakerRef.current && result.speaker_verified === false) {
+            // Not the enrolled speaker — silently discard
             return;
           }
           const text = result.text;
@@ -297,9 +303,7 @@ export function useSpeechRecognition(options?: {
             onFinalTranscriptRef.current(text.trim());
           }
         } catch (err) {
-          setError(
-            err instanceof Error ? err.message : "Transcription failed"
-          );
+          setError(err instanceof Error ? err.message : "Transcription failed");
         } finally {
           setIsTranscribing(false);
         }
@@ -399,12 +403,10 @@ export function useKokoroTTS() {
 
       try {
         const sentences = splitSentences(clean);
-        if (sentences.length === 0) {
-          setIsSpeaking(false);
-          return;
-        }
+        if (sentences.length === 0) return;
 
-        // Fire all TTS requests in parallel for pipelining
+        // Fire all TTS requests in parallel — start playing first sentence
+        // while the rest are still generating
         const audioPromises = sentences.map((s) =>
           fetchTTSAudio(token, s, voice, speed).catch(() => null)
         );
@@ -416,7 +418,7 @@ export function useKokoroTTS() {
           await playAudioBlob(blob);
         }
       } catch {
-        // TTS failed silently
+        // TTS failed silently — conversation loop continues
       } finally {
         setIsSpeaking(false);
       }
