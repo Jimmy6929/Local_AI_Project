@@ -107,6 +107,10 @@ export function useSpeechRecognition(options?: { lang?: string; onFinalTranscrip
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const supportsSpeechRecognition = useMemo(() => getRecognitionCtor() !== null, []);
 
+  const lang = options?.lang || "en-US";
+  const onFinalTranscriptRef = useRef(options?.onFinalTranscript);
+  onFinalTranscriptRef.current = options?.onFinalTranscript;
+
   const createRecognition = useCallback(() => {
     if (recognitionRef.current) return recognitionRef.current;
     const Ctor = getRecognitionCtor();
@@ -115,7 +119,7 @@ export function useSpeechRecognition(options?: { lang?: string; onFinalTranscrip
     const recognition = new Ctor();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = options?.lang || "en-US";
+    recognition.lang = lang;
 
     recognition.onstart = () => {
       setError(null);
@@ -143,14 +147,14 @@ export function useSpeechRecognition(options?: { lang?: string; onFinalTranscrip
       }
       const merged = `${finalText} ${interim}`.trim();
       setTranscript(merged);
-      if (finalText.trim() && options?.onFinalTranscript) {
-        options.onFinalTranscript(finalText.trim());
+      if (finalText.trim() && onFinalTranscriptRef.current) {
+        onFinalTranscriptRef.current(finalText.trim());
       }
     };
 
     recognitionRef.current = recognition;
     return recognition;
-  }, [options]);
+  }, [lang]);
 
   const startListening = useCallback(() => {
     setError(null);
@@ -160,9 +164,9 @@ export function useSpeechRecognition(options?: { lang?: string; onFinalTranscrip
     }
     const recognition = createRecognition();
     if (!recognition) return;
-    recognition.lang = options?.lang || "en-US";
+    recognition.lang = lang;
     recognition.start();
-  }, [createRecognition, options, supportsSpeechRecognition]);
+  }, [createRecognition, lang, supportsSpeechRecognition]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();

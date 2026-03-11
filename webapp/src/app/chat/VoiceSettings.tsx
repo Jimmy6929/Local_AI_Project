@@ -23,8 +23,8 @@ export default function VoiceSettings({ open, voices, settings, onChange }: Voic
         className="w-full bg-black/40 border border-white/[0.12] text-[#eaeaea] px-2 py-1.5 text-xs rounded-lg focus:outline-none focus:border-[#00ff41]/40"
       >
         <option value="">System default</option>
-        {voices.map((voice) => (
-          <option key={voice.voiceURI} value={voice.voiceURI}>
+        {voices.map((voice, idx) => (
+          <option key={`${voice.voiceURI}-${idx}`} value={voice.voiceURI}>
             {voice.name} ({voice.lang})
           </option>
         ))}
