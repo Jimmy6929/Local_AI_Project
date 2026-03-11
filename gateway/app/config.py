@@ -84,6 +84,12 @@ class Settings(BaseSettings):
     kokoro_tts_url: str = "http://localhost:8880"
     kokoro_tts_default_voice: str = "bm_george"
 
+    # ── SearXNG Web Search ─────────────────────────────────────
+    searxng_url: str = "http://localhost:8888"
+    web_search_enabled: bool = True
+    web_search_timeout: float = 5.0
+    web_search_max_results: int = 5
+
     # Database URL (for direct connections if needed)
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
     

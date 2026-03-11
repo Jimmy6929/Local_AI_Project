@@ -70,6 +70,11 @@ export async function sendMessage(
   });
 }
 
+export interface SearchSource {
+  title: string;
+  url: string;
+}
+
 export async function sendMessageStream(
   token: string,
   message: string,
@@ -78,7 +83,8 @@ export async function sendMessageStream(
   conversationMode: boolean = false,
   onChunk: (text: string) => void = () => {},
   onSessionId: (id: string) => void = () => {},
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onSearchDone?: (sources: SearchSource[]) => void,
 ): Promise<string> {
   const res = await fetch(`${GATEWAY_URL}/chat/stream`, {
     method: "POST",
@@ -132,6 +138,11 @@ export async function sendMessageStream(
 
     if (data.session_id && !data.choices) {
       onSessionId(data.session_id);
+      return;
+    }
+
+    if (data.type === "search_done" && data.sources && onSearchDone) {
+      onSearchDone(data.sources as SearchSource[]);
       return;
     }
 

@@ -11,6 +11,7 @@ import {
   renameSession,
   type SessionInfo,
   type ChatMessage,
+  type SearchSource,
 } from "@/lib/gateway";
 import {
   useSpeechRecognition,
@@ -31,6 +32,7 @@ interface DisplayMessage {
   model_used?: string | null;
   streaming?: boolean;
   streamStartedAt?: number;
+  sources?: SearchSource[];
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +52,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [mode, setMode] = useState<"instant" | "thinking" | "thinking_harder">("thinking");
 
   // ── Mode flags ────────────────────────────────────────────────────────────
@@ -263,6 +266,7 @@ export default function ChatPage() {
     abortControllerRef.current = controller;
     const now = Date.now();
 
+    setIsSearching(true);
     setMessages((prev) => [
       ...prev,
       { id: `temp-${now}`, role: "user", content: userMessage },
@@ -290,9 +294,16 @@ export default function ChatPage() {
           setMessages((prev) => prev.map((m) => m.streaming ? { ...m, content } : m));
         },
         (sid) => { setActiveSessionId(sid); },
-        controller.signal
+        controller.signal,
+        (sources) => {
+          setIsSearching(false);
+          setMessages((prev) =>
+            prev.map((m) => m.streaming ? { ...m, sources } : m)
+          );
+        },
       );
 
+      setIsSearching(false);
       setMessages((prev) => prev.map((m) => m.streaming ? { ...m, streaming: false } : m));
 
       // Alfred mode: speak the response then the auto-restart effect re-opens the mic
@@ -302,6 +313,7 @@ export default function ChatPage() {
 
       loadSessions();
     } catch (err) {
+      setIsSearching(false);
       if (controller.signal.aborted) {
         setMessages((prev) => prev.map((m) => m.streaming ? { ...m, streaming: false } : m));
       } else {
@@ -453,6 +465,7 @@ export default function ChatPage() {
       if (isSpeaking) return "Alfred is speaking...";
       if (isTranscribing) return "Transcribing...";
       if (isListening) return wakeWordEnabled ? 'Listening for "Hey Alfred"...' : "Listening...";
+      if (isSearching) return "Searching the web...";
       if (loading) return "Thinking...";
       return wakeWordEnabled
         ? 'Say "Hey Alfred" to start · "stop" or "goodbye" to end'
@@ -527,6 +540,8 @@ export default function ChatPage() {
               mode={msg.mode_used}
               model={msg.model_used}
               streamStartedAt={msg.streamStartedAt}
+              sources={msg.sources}
+              isSearching={msg.streaming && isSearching}
             />
           ))}
           <div ref={messagesEndRef} />

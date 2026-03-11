@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { parseThinkingContent } from "@/lib/thinkParser";
+import type { SearchSource } from "@/lib/gateway";
 
 export interface MessageBubbleProps {
   role: "user" | "assistant" | "system";
@@ -15,6 +16,8 @@ export interface MessageBubbleProps {
   model?: string | null;
   metadata?: Record<string, unknown>;
   streamStartedAt?: number;
+  sources?: SearchSource[];
+  isSearching?: boolean;
 }
 
 function useElapsedSeconds(startedAt?: number, running?: boolean): number {
@@ -43,7 +46,10 @@ export default function MessageBubble({
   streaming = false,
   mode,
   streamStartedAt,
+  sources,
+  isSearching,
 }: MessageBubbleProps) {
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const parsed = useMemo(() => parseThinkingContent(content), [content]);
   const [thinkOpen, setThinkOpen] = useState(false);
   const elapsed = useElapsedSeconds(streamStartedAt, streaming);
@@ -81,6 +87,11 @@ export default function MessageBubble({
               {mode === "thinking_harder" ? "Think+" : mode === "thinking" ? "Think" : "Fast"}
             </span>
           )}
+          {!isUser && sources && sources.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-md text-[9px] bg-[#3399ff]/15 text-[#66bbff]">
+              Web
+            </span>
+          )}
         </div>
 
         {/* Thinking panel */}
@@ -111,6 +122,17 @@ export default function MessageBubble({
                 {parsed.thinking}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Searching indicator */}
+        {!isUser && isSearching && (
+          <div className="mb-2 flex items-center gap-2 text-[11px] text-[#66bbff]">
+            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
+            </svg>
+            Searching the web...
           </div>
         )}
 
@@ -162,6 +184,45 @@ export default function MessageBubble({
             ) : null}
             {streaming && (
               <span className="inline-block w-2 h-4 bg-[#00ff41] ml-0.5 animate-pulse rounded-sm" />
+            )}
+          </div>
+        )}
+
+        {/* Sources */}
+        {!isUser && sources && sources.length > 0 && (
+          <div className="mt-2 rounded-xl bg-black/30 overflow-hidden">
+            <button
+              onClick={() => setSourcesOpen(!sourcesOpen)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[10px] text-[#66bbff] hover:text-[#99ccff] transition-colors"
+            >
+              <span
+                className={`transition-transform duration-200 text-[8px] ${
+                  sourcesOpen ? "rotate-90" : ""
+                }`}
+              >
+                ▶
+              </span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span>{sources.length} source{sources.length !== 1 ? "s" : ""}</span>
+            </button>
+            {sourcesOpen && (
+              <div className="px-3 pb-2.5 space-y-1.5 border-t border-white/[0.06]">
+                {sources.map((src, i) => (
+                  <a
+                    key={i}
+                    href={src.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-[11px] text-[#66bbff] hover:text-[#99ccff] truncate transition-colors"
+                    title={src.url}
+                  >
+                    {src.title || src.url}
+                  </a>
+                ))}
+              </div>
             )}
           </div>
         )}

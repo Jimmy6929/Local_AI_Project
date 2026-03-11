@@ -23,6 +23,7 @@ from app.models.chat import (
 )
 from app.services.database import DatabaseService, get_database_service
 from app.services.inference import InferenceService, get_inference_service
+from app.services.web_search import WebSearchService, get_web_search_service
 
 
 SYSTEM_PROMPT_TEMPLATE = """\
@@ -53,6 +54,11 @@ STYLE:
 • Use sections and bullet points.
 • Avoid unnecessary verbosity.
 
+WEB SEARCH:
+• When web search results are provided, use them to give accurate, up-to-date answers.
+• Cite sources inline using [Source Title](url) format when referencing specific information.
+• If search results conflict with your training data, prefer the search results as they are more recent.
+• Do not mention that you were given search results — just use the information naturally.
 
 Current date: {current_date}\
 """
@@ -77,6 +83,12 @@ RESPONSE STRUCTURE (use when the topic is non-trivial / problem-oriented)
 4. Deliver the concrete answer / solution / next step(s).
 
 When the question is light / social / one-shot (“hi”, “who are you”, “tell me a joke”) → skip the full structure. Reply briefly, stay in character, keep momentum.
+
+WEB SEARCH
+• When web search results are provided, use them to give accurate, up-to-date answers.
+• Cite sources naturally in conversation — e.g. “According to …” — without markdown link syntax (the user is listening, not reading).
+• If search results conflict with your training data, prefer the search results as they are more recent.
+• Do not mention that you were given search results — just use the information naturally.
 
 GENERAL RULES
 • Never lecture the user about what AI “really” is unless directly asked to explain it.
@@ -135,6 +147,7 @@ async def send_message(
     user: JWTPayload = Depends(get_current_user),
     db: DatabaseService = Depends(get_database_service),
     inference: InferenceService = Depends(get_inference_service),
+    web_search: WebSearchService = Depends(get_web_search_service),
 ) -> ChatResponse:
     """
     Send a message and get an AI response.
@@ -186,6 +199,17 @@ async def send_message(
         for msg in history
     ]
     
+    # Web search: inject real-time results into context
+    search_results = []
+    if web_search.should_search(request.message):
+        search_results = await web_search.search(request.message)
+        if search_results:
+            context_text = web_search.format_results_for_context(search_results)
+            messages.insert(-1, {
+                "role": "system",
+                "content": f"Web search results for context:\n\n{context_text}",
+            })
+
     # Voice conversation always uses instant tier (Qwen 3.5 4B); config via INFERENCE_INSTANT_*
     inference_mode = "instant" if request.conversation_mode else request.mode.value
 
@@ -342,6 +366,7 @@ async def send_message_stream(
     user: JWTPayload = Depends(get_current_user),
     db: DatabaseService = Depends(get_database_service),
     inference: InferenceService = Depends(get_inference_service),
+    web_search: WebSearchService = Depends(get_web_search_service),
 ):
     """
     Send a message and stream the AI response via Server-Sent Events (SSE).
@@ -394,6 +419,17 @@ async def send_message_stream(
         {"role": msg["role"], "content": msg["content"]}
         for msg in history
     ]
+
+    # Web search: run before streaming so results are ready
+    search_results = []
+    if web_search.should_search(request.message):
+        search_results = await web_search.search(request.message)
+        if search_results:
+            context_text = web_search.format_results_for_context(search_results)
+            messages.insert(-1, {
+                "role": "system",
+                "content": f"Web search results for context:\n\n{context_text}",
+            })
     
     # Voice conversation always uses instant tier (Qwen 3.5 4B); config via INFERENCE_INSTANT_*
     inference_mode = "instant" if request.conversation_mode else request.mode.value
@@ -411,6 +447,13 @@ async def send_message_stream(
             yield f"data: {json.dumps({'session_id': session_id})}\n\n"
         except (BrokenPipeError, ConnectionResetError, RuntimeError, asyncio.CancelledError):
             return
+
+        if search_results:
+            sources = [{"title": r["title"], "url": r["url"]} for r in search_results]
+            try:
+                yield f"data: {json.dumps({'type': 'search_done', 'sources': sources})}\n\n"
+            except (BrokenPipeError, ConnectionResetError, RuntimeError, asyncio.CancelledError):
+                return
         
         async for chunk in inference.generate_response_stream(
             messages=messages,
