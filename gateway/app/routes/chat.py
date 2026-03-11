@@ -6,7 +6,7 @@ import asyncio
 import re
 from datetime import date
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.middleware.auth import JWTPayload, get_current_user
@@ -471,3 +471,23 @@ async def send_message_stream(
             "X-Session-ID": session_id,
         },
     )
+
+
+@router.post("/transcribe")
+async def transcribe_audio_endpoint(
+    file: UploadFile = File(...),
+    user: JWTPayload = Depends(get_current_user),
+):
+    """Transcribe audio to text using local Whisper model."""
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Empty audio file")
+
+    from app.services.transcription import transcribe_audio
+
+    try:
+        text = await transcribe_audio(audio_bytes, file.filename or "audio.webm")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}") from exc
+
+    return {"text": text}

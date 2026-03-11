@@ -13,5 +13,11 @@ supabase==2.10.0
 # HTTP client
 httpx==0.27.0
 
+# File uploads (FastAPI UploadFile)
+python-multipart==0.0.12
+
+# Local speech-to-text (Whisper)
+faster-whisper==1.1.1
+
 # Environment variables
 python-dotenv==1.0.1

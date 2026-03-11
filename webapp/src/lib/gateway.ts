@@ -274,6 +274,30 @@ export async function deleteSession(
   });
 }
 
+export async function transcribeAudio(
+  token: string,
+  audioBlob: Blob
+): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", audioBlob, "recording.webm");
+
+  const res = await fetch(`${GATEWAY_URL}/chat/transcribe`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Transcription error ${res.status}: ${text}`);
+  }
+
+  const data = await res.json();
+  return data.text || "";
+}
+
 export async function checkInferenceHealth(): Promise<Record<string, unknown>> {
   const res = await fetch(`${GATEWAY_URL}/health/inference`);
   return res.json();
