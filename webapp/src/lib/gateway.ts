@@ -56,7 +56,8 @@ export async function sendMessage(
   token: string,
   message: string,
   mode: "instant" | "thinking" | "thinking_harder" = "instant",
-  sessionId?: string
+  sessionId?: string,
+  conversationMode: boolean = false
 ): Promise<ChatResponse> {
   return apiCall<ChatResponse>("/chat", token, {
     method: "POST",
@@ -64,6 +65,7 @@ export async function sendMessage(
       message,
       mode,
       session_id: sessionId || null,
+      conversation_mode: conversationMode,
     }),
   });
 }
@@ -73,6 +75,7 @@ export async function sendMessageStream(
   message: string,
   mode: "instant" | "thinking" | "thinking_harder" = "instant",
   sessionId?: string,
+  conversationMode: boolean = false,
   onChunk: (text: string) => void = () => {},
   onSessionId: (id: string) => void = () => {},
   signal?: AbortSignal
@@ -87,6 +90,7 @@ export async function sendMessageStream(
       message,
       mode,
       session_id: sessionId || null,
+      conversation_mode: conversationMode,
     }),
     signal,
   });

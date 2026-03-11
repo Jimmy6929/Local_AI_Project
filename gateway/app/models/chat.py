@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=32000, description="User message")
     session_id: Optional[str] = Field(None, description="Existing session ID, or null for new session")
     mode: ChatMode = Field(ChatMode.INSTANT, description="Inference mode: instant (fast) or thinking (deeper reasoning)")
+    conversation_mode: bool = Field(False, description="When true, use voice conversation system prompt")
 
 
 class ChatMessage(BaseModel):

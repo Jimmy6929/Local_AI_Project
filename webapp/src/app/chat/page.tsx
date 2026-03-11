@@ -12,8 +12,15 @@ import {
   type SessionInfo,
   type ChatMessage,
 } from "@/lib/gateway";
+import {
+  useSpeechRecognition,
+  useSpeechSynthesis,
+  useSpeechVoices,
+  useVoiceSettings,
+} from "@/lib/voice";
 import Sidebar from "./sidebar";
 import MessageBubble from "./MessageBubble";
+import VoiceSettings from "./VoiceSettings";
 
 interface DisplayMessage {
   id: string;
@@ -35,6 +42,8 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"instant" | "thinking" | "thinking_harder">("thinking");
+  const [conversationMode, setConversationMode] = useState(false);
+  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -47,6 +56,30 @@ export default function ChatPage() {
   const isStreamingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const userScrolledUpRef = useRef(false);
+  const sendVoiceMessageRef = useRef<(text: string) => void>(() => {});
+  const { settings: voiceSettings, setSettings: setVoiceSettings } = useVoiceSettings();
+  const voices = useSpeechVoices();
+  const { supportsSpeechSynthesis, speak, cancel } = useSpeechSynthesis(voiceSettings, voices);
+
+  const onFinalTranscript = useCallback(
+    (text: string) => {
+      const clean = text.trim();
+      if (!clean) return;
+      setInput(clean);
+      if (!conversationMode) return;
+      sendVoiceMessageRef.current(clean);
+    },
+    [conversationMode]
+  );
+
+  const {
+    supportsSpeechRecognition,
+    isListening,
+    error: voiceInputError,
+    startListening,
+    stopListening,
+    abortListening,
+  } = useSpeechRecognition({ lang: "en-US", onFinalTranscript });
 
   useEffect(() => {
     const supabase = createClient();
@@ -171,10 +204,10 @@ export default function ChatPage() {
     resizeTextarea();
   }, [input, resizeTextarea]);
 
-  async function handleSend() {
-    if (!input.trim() || !token || loading) return;
+  async function sendMessageWithText(rawInput: string) {
+    if (!rawInput.trim() || !token || loading) return;
 
-    const userMessage = input.trim();
+    const userMessage = rawInput.trim();
     setInput("");
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
@@ -208,11 +241,16 @@ export default function ChatPage() {
     isStreamingRef.current = true;
 
     try {
-      await sendMessageStream(
+      if (conversationMode) {
+        cancel();
+      }
+
+      const finalContent = await sendMessageStream(
         token,
         userMessage,
         mode,
         activeSessionId || undefined,
+        conversationMode,
         (content) => {
           setMessages((prev) =>
             prev.map((m) =>
@@ -229,6 +267,9 @@ export default function ChatPage() {
       setMessages((prev) =>
         prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
       );
+      if (conversationMode && supportsSpeechSynthesis && finalContent.trim()) {
+        speak(finalContent);
+      }
 
       loadSessions();
     } catch (err) {
@@ -260,8 +301,17 @@ export default function ChatPage() {
     }
   }
 
+  sendVoiceMessageRef.current = (text: string) => {
+    void sendMessageWithText(text);
+  };
+
+  function handleSend() {
+    void sendMessageWithText(input);
+  }
+
   function handleStop() {
     abortControllerRef.current?.abort();
+    cancel();
   }
 
   function handleNewChat() {
@@ -306,6 +356,25 @@ export default function ChatPage() {
       handleSend();
     }
   }
+
+  function handleMicClick() {
+    if (!supportsSpeechRecognition || loading) return;
+    if (isListening) {
+      stopListening();
+      return;
+    }
+    cancel();
+    startListening();
+  }
+
+  useEffect(() => {
+    if (!conversationMode) {
+      abortListening();
+      setVoiceSettingsOpen(false);
+      return;
+    }
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [abortListening, conversationMode]);
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -419,6 +488,13 @@ export default function ChatPage() {
         {/* Input Area - Floating glass bar */}
         <div className="p-4 pb-5 shrink-0">
           <div className="max-w-3xl mx-auto">
+            <VoiceSettings
+              open={voiceSettingsOpen}
+              voices={voices}
+              settings={voiceSettings}
+              onChange={setVoiceSettings}
+            />
+
             {/* Image preview */}
             {imagePreview && (
               <div className="mb-2 flex items-center gap-2 animate-fade-in">
@@ -490,6 +566,52 @@ export default function ChatPage() {
                 </button>
               )}
 
+              {/* Conversation mode toggle */}
+              <button
+                onClick={() => setConversationMode((prev) => !prev)}
+                className={`text-[11px] px-3 py-1.5 rounded-xl transition-all shrink-0 ${
+                  conversationMode
+                    ? "bg-[#33ccff]/20 text-[#66ddff] border border-[#33ccff]/40"
+                    : "text-[#999] border border-white/[0.08] hover:text-[#66ddff] hover:border-white/[0.15]"
+                }`}
+                title="Voice conversation mode"
+              >
+                Voice
+              </button>
+
+              {conversationMode && (
+                <>
+                  <button
+                    onClick={handleMicClick}
+                    disabled={!supportsSpeechRecognition || loading}
+                    className={`p-2 rounded-xl transition-all shrink-0 ${
+                      isListening
+                        ? "bg-[#ff4444]/20 text-[#ff6666] animate-pulse"
+                        : "text-[#66ddff] hover:bg-[#33ccff]/10"
+                    } disabled:opacity-30 disabled:cursor-not-allowed`}
+                    title={supportsSpeechRecognition ? "Speak" : "Voice input not supported"}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" y1="19" x2="12" y2="23" />
+                      <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => setVoiceSettingsOpen((prev) => !prev)}
+                    className="p-2 rounded-xl text-[#66ddff] hover:bg-[#33ccff]/10 transition-all shrink-0"
+                    title="Voice settings"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                  </button>
+                </>
+              )}
+
               {/* Text input */}
               <textarea
                 ref={inputRef}
@@ -532,8 +654,13 @@ export default function ChatPage() {
             </div>
 
             <div className="text-[10px] text-[#777] mt-2 text-center">
-              Enter to send · Shift+Enter for new line
+              {conversationMode
+                ? "Voice mode on · tap mic to speak · Enter sends typed message"
+                : "Enter to send · Shift+Enter for new line"}
             </div>
+            {voiceInputError && conversationMode && (
+              <div className="text-[10px] text-[#ff7777] mt-1 text-center">{voiceInputError}</div>
+            )}
           </div>
         </div>
       </div>
