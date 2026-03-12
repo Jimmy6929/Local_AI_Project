@@ -277,7 +277,7 @@ async def send_message(
             role="assistant",
             content=assistant_msg["content"],
             mode_used=assistant_msg.get("mode_used"),
-            model_used=inference_result.get("model"),
+            inference_model=inference_result.get("model"),
             created_at=assistant_msg["created_at"],
         ),
         session_title=session.get("title"),
@@ -328,7 +328,7 @@ async def get_session_messages(
             role=m["role"],
             content=m["content"],
             mode_used=m.get("mode_used"),
-            model_used=m.get("model_used"),
+            inference_model=m.get("model_used"),
             reasoning_content=m.get("reasoning_content"),
             created_at=m["created_at"],
         )

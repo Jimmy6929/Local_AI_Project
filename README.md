@@ -774,6 +774,12 @@ docker logs $(docker ps -q --filter ancestor=ghcr.io/remsky/kokoro-fastapi-cpu:l
 # Voice transcription fails
 brew install ffmpeg                        # Required for audio conversion
 # Whisper tiny model auto-downloads on first use (~75 MB)
+
+# OMP Error: "libiomp5.dylib already initialized" (macOS, Whisper/embedding)
+# Use make dev-gateway (sets KMP_DUPLICATE_LIB_OK), or add KMP_DUPLICATE_LIB_OK=TRUE to .env.local
+
+# Embedding model slow on first chat (RAG)
+# Orange/orange-nomic-v1.5-1536 downloads ~400MB on first use — wait 1–2 min
 ```
 
 ## Tech Stack

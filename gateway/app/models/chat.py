@@ -29,12 +29,12 @@ class ChatRequest(BaseModel):
 
 class ChatMessage(BaseModel):
     """A single chat message."""
-    model_config = ConfigDict(protected_namespaces=())  # allow model_used field
+    model_config = ConfigDict(serialize_by_alias=True)
     id: str
     role: str  # 'user' | 'assistant' | 'system'
     content: str
     mode_used: Optional[str] = None
-    model_used: Optional[str] = None
+    inference_model: Optional[str] = Field(None, alias="model_used")
     reasoning_content: Optional[str] = None
     created_at: datetime
 
