@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routes import health, chat
+from app.routes import health, chat, documents
 
 
 @asynccontextmanager
@@ -25,6 +25,10 @@ async def lifespan(app: FastAPI):
     print(f"   Thinking tier: {settings.inference_thinking_url or '(not configured — mock/fallback)'}")
     print(f"     Model: {settings.get_model_for_mode('thinking')}")
     print(f"   Thinking fallback to instant: {settings.routing_thinking_fallback_to_instant}")
+    print(f"   RAG enabled: {settings.rag_enabled}")
+    if settings.rag_enabled:
+        print(f"     Embedding model: {settings.embedding_model}")
+        print(f"     Match count: {settings.rag_match_count}, threshold: {settings.rag_match_threshold}")
     yield
     print(f"Shutting down {settings.app_name}")
 
@@ -59,6 +63,7 @@ def create_app() -> FastAPI:
     # Register routes
     app.include_router(health.router)
     app.include_router(chat.router)
+    app.include_router(documents.router)
     
     return app
 

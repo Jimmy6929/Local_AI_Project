@@ -19,5 +19,13 @@ python-multipart==0.0.12
 # Local speech-to-text (Whisper)
 faster-whisper==1.1.1
 
+# RAG: embeddings
+sentence-transformers>=3.0.0
+torch>=2.0.0
+
+# RAG: document parsing
+pypdf>=4.0.0
+python-docx>=1.1.0
+
 # Environment variables
 python-dotenv==1.0.1

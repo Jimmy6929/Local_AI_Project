@@ -24,6 +24,7 @@ from app.models.chat import (
 from app.services.database import DatabaseService, get_database_service
 from app.services.inference import InferenceService, get_inference_service
 from app.services.web_search import WebSearchService, get_web_search_service
+from app.services.rag import RAGService, get_rag_service
 
 
 SYSTEM_PROMPT_TEMPLATE = """\
@@ -60,6 +61,11 @@ WEB SEARCH:
 • If search results conflict with your training data, prefer the search results as they are more recent.
 • Do not mention that you were given search results — just use the information naturally.
 
+DOCUMENT MEMORY:
+• When document context is provided, use it to answer the user's question.
+• Reference the source document filename when citing specific information from uploaded documents.
+• If the user's question is not related to any provided document context, answer normally without forcing document references.
+
 Current date: {current_date}\
 """
 
@@ -89,6 +95,11 @@ WEB SEARCH
 • Cite sources naturally in conversation — e.g. “According to …” — without markdown link syntax (the user is listening, not reading).
 • If search results conflict with your training data, prefer the search results as they are more recent.
 • Do not mention that you were given search results — just use the information naturally.
+
+DOCUMENT MEMORY
+• When document context is provided, use it to answer the user’s question.
+• Reference the source document filename naturally in conversation when citing specific information.
+• If the user’s question is not related to any provided document context, answer normally.
 
 GENERAL RULES
 • Never lecture the user about what AI “really” is unless directly asked to explain it.
@@ -148,6 +159,7 @@ async def send_message(
     db: DatabaseService = Depends(get_database_service),
     inference: InferenceService = Depends(get_inference_service),
     web_search: WebSearchService = Depends(get_web_search_service),
+    rag: RAGService = Depends(get_rag_service),
 ) -> ChatResponse:
     """
     Send a message and get an AI response.
@@ -206,6 +218,12 @@ async def send_message(
         if search_results:
             context_text = web_search.format_results_for_context(search_results)
             messages[0]["content"] += f"\n\nWEB SEARCH RESULTS:\n{context_text}"
+
+    # RAG: inject relevant document chunks into context
+    rag_chunks = await rag.retrieve_context(token, request.message)
+    if rag_chunks:
+        rag_text = rag.format_context(rag_chunks)
+        messages[0]["content"] += f"\n\nDOCUMENT CONTEXT:\n{rag_text}"
 
     total_chars = sum(len(m.get("content", "")) for m in messages)
     print(f"[chat] Sending {len(messages)} messages ({total_chars} chars) to inference")
@@ -367,6 +385,7 @@ async def send_message_stream(
     db: DatabaseService = Depends(get_database_service),
     inference: InferenceService = Depends(get_inference_service),
     web_search: WebSearchService = Depends(get_web_search_service),
+    rag: RAGService = Depends(get_rag_service),
 ):
     """
     Send a message and stream the AI response via Server-Sent Events (SSE).
@@ -427,6 +446,12 @@ async def send_message_stream(
         if search_results:
             context_text = web_search.format_results_for_context(search_results)
             messages[0]["content"] += f"\n\nWEB SEARCH RESULTS:\n{context_text}"
+
+    # RAG: inject relevant document chunks into context
+    rag_chunks = await rag.retrieve_context(token, request.message)
+    if rag_chunks:
+        rag_text = rag.format_context(rag_chunks)
+        messages[0]["content"] += f"\n\nDOCUMENT CONTEXT:\n{rag_text}"
 
     total_chars = sum(len(m.get("content", "")) for m in messages)
     print(f"[chat] Sending {len(messages)} messages ({total_chars} chars) to inference")

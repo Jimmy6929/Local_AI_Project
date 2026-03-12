@@ -387,3 +387,64 @@ export async function checkInferenceHealth(): Promise<Record<string, unknown>> {
   const res = await fetch(`${GATEWAY_URL}/health/inference`);
   return res.json();
 }
+
+// ── Documents / RAG ──────────────────────────────────────────────────────
+
+export interface DocumentInfo {
+  id: string;
+  filename: string;
+  file_type: string;
+  file_size: number;
+  status: string;
+  created_at: string;
+  processed_at: string | null;
+}
+
+export interface UploadResponse {
+  id: string;
+  filename: string;
+  status: string;
+  chunks: number;
+  message: string;
+}
+
+export async function uploadDocument(
+  token: string,
+  file: File
+): Promise<UploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${GATEWAY_URL}/documents/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Upload error ${res.status}: ${errText}`);
+  }
+
+  return res.json();
+}
+
+export async function listDocuments(
+  token: string
+): Promise<{ documents: DocumentInfo[] }> {
+  return apiCall<{ documents: DocumentInfo[] }>("/documents", token);
+}
+
+export async function deleteDocument(
+  token: string,
+  documentId: string
+): Promise<void> {
+  await fetch(`${GATEWAY_URL}/documents/${documentId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
