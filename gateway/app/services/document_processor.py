@@ -146,7 +146,13 @@ class DocumentProcessor:
 
         print(f"[doc_processor] Extracted {len(text)} chars → {len(chunks)} chunks")
 
-        embeddings = self.embedding.embed_batch(chunks)
+        print(f"[doc_processor] Generating embeddings for {len(chunks)} chunks...")
+        try:
+            embeddings = self.embedding.embed_batch(chunks)
+        except Exception as exc:
+            print(f"[doc_processor] Embedding failed: {type(exc).__name__}: {exc}")
+            raise
+        print(f"[doc_processor] Embeddings complete — {len(embeddings)} vectors of dim {len(embeddings[0])}")
         return list(zip(chunks, embeddings))
 
 

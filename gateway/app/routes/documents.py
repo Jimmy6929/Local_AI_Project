@@ -176,15 +176,18 @@ async def upload_document(
     # 3. Process: extract → chunk → embed
     try:
         _update_document_status(settings, doc_id, "processing")
+        print(f"[documents] Processing {filename} ({len(data)} bytes, {content_type})")
         chunk_pairs = processor.process(data, content_type)
+        print(f"[documents] Processing complete: {len(chunk_pairs)} chunk+embedding pairs")
     except Exception as exc:
+        print(f"[documents] Processing FAILED: {type(exc).__name__}: {exc}")
         _update_document_status(settings, doc_id, "failed")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Processing failed: {exc}",
         )
 
-    # 4. Insert chunks with embeddings
+    # 4. Insert chunks with embeddings (batched to avoid oversized payloads)
     try:
         chunk_rows = [
             {
@@ -196,8 +199,13 @@ async def upload_document(
             }
             for idx, (text, embedding) in enumerate(chunk_pairs)
         ]
-        _insert_chunks(settings, chunk_rows)
+        batch_size = 20
+        for i in range(0, len(chunk_rows), batch_size):
+            batch = chunk_rows[i : i + batch_size]
+            _insert_chunks(settings, batch)
+            print(f"[documents] Inserted chunks {i}–{i + len(batch) - 1}")
     except Exception as exc:
+        print(f"[documents] Chunk insert FAILED: {type(exc).__name__}: {exc}")
         _update_document_status(settings, doc_id, "failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
