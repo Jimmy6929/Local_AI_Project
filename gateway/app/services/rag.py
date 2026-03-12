@@ -43,6 +43,7 @@ class RAGService:
         if not self.enabled:
             return []
 
+        print(f"[rag] Embedding query ({len(query)} chars)...")
         query_embedding = self.embedding.embed(query)
         count = limit or self.match_count
         thresh = threshold or self.match_threshold
@@ -64,11 +65,15 @@ class RAGService:
                 resp = await client.post(rpc_url, json=payload, headers=headers)
                 resp.raise_for_status()
                 results = resp.json()
+        except httpx.HTTPStatusError as exc:
+            print(f"[rag] RPC HTTP error {exc.response.status_code}: {exc.response.text[:500]}")
+            return []
         except Exception as exc:
-            print(f"[rag] Similarity search failed: {exc}")
+            print(f"[rag] Similarity search failed: {type(exc).__name__}: {exc}")
             return []
 
         if not results:
+            print(f"[rag] No matching chunks (threshold={thresh}). Try lowering RAG_MATCH_THRESHOLD.")
             return []
 
         print(f"[rag] Found {len(results)} matching chunks (top similarity: {results[0].get('similarity', 0):.3f})")

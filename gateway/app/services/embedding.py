@@ -27,18 +27,25 @@ class EmbeddingService:
         self._model = SentenceTransformer(self.model_name, trust_remote_code=True)
         print(f"[embedding] Model loaded — dim={self._model.get_sentence_embedding_dimension()}")
 
-    def embed(self, text: str) -> List[float]:
+    # Orange/orange-nomic-v1.5-1536 requires task prefixes for correct RAG similarity
+    _QUERY_PREFIX = "search_query: "
+    _DOC_PREFIX = "search_document: "
+
+    def embed(self, text: str, prefix: str = "search_query") -> List[float]:
         """Embed a single text string. Returns a 1536-dim float list."""
         self._load_model()
-        vector = self._model.encode(text, normalize_embeddings=True)
+        p = self._QUERY_PREFIX if prefix == "search_query" else self._DOC_PREFIX
+        vector = self._model.encode(p + text, normalize_embeddings=True)
         return vector.tolist()
 
-    def embed_batch(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
+    def embed_batch(self, texts: List[str], batch_size: int = 32, prefix: str = "search_document") -> List[List[float]]:
         """Embed multiple texts. Returns list of 1536-dim float lists."""
         if not texts:
             return []
         self._load_model()
-        vectors = self._model.encode(texts, batch_size=batch_size, normalize_embeddings=True)
+        p = self._QUERY_PREFIX if prefix == "search_query" else self._DOC_PREFIX
+        prefixed = [p + t for t in texts]
+        vectors = self._model.encode(prefixed, batch_size=batch_size, normalize_embeddings=True)
         return [v.tolist() for v in vectors]
 
 

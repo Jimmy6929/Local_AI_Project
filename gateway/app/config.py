@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     rag_enabled: bool = True
     embedding_model: str = "Orange/orange-nomic-v1.5-1536"
     rag_match_count: int = 5
-    rag_match_threshold: float = 0.7
+    rag_match_threshold: float = 0.5
     rag_max_context_chars: int = 4000
     rag_chunk_size: int = 512
     rag_chunk_overlap: int = 50
