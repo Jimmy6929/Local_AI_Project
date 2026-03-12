@@ -5,6 +5,11 @@ This is the main entry point for the Gateway API that sits between
 the web app and inference endpoints.
 """
 
+# Must be set before any OpenMP-using libraries load (faster-whisper, numpy, etc.)
+# Avoids "OMP: Error #15: multiple copies of libiomp5.dylib" on macOS
+import os
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

@@ -9,6 +9,9 @@ import asyncio
 import os
 import tempfile
 
+# Avoid OpenMP conflict when faster-whisper loads (Intel MKL vs system libiomp5)
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 _model = None
 
 

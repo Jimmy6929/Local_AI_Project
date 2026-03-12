@@ -8,7 +8,7 @@ responses so the frontend can display appropriate indicators.
 
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 
 
@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
 
 class ChatMessage(BaseModel):
     """A single chat message."""
+    model_config = ConfigDict(protected_namespaces=())  # allow model_used field
     id: str
     role: str  # 'user' | 'assistant' | 'system'
     content: str
