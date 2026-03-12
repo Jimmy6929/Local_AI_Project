@@ -5,6 +5,7 @@ This is the main entry point for the Gateway API that sits between
 the web app and inference endpoints.
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +30,12 @@ async def lifespan(app: FastAPI):
     if settings.rag_enabled:
         print(f"     Embedding model: {settings.embedding_model}")
         print(f"     Match count: {settings.rag_match_count}, threshold: {settings.rag_match_threshold}")
+        if settings.embedding_preload:
+            print(f"     Preloading embedding model in background...")
+            from app.services.embedding import get_embedding_service
+            def _preload():
+                get_embedding_service()._load_model()
+            asyncio.create_task(asyncio.to_thread(_preload))
     yield
     print(f"Shutting down {settings.app_name}")
 

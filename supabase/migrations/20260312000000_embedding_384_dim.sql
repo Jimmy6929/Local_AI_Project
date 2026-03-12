@@ -1,11 +1,26 @@
 -- ============================================
--- 06_similarity_search_function.sql
--- Create similarity search function for RAG
--- Run this SEVENTH
+-- Switch embedding dimension from 1536 to 384
+-- (all-MiniLM-L6-v2 lighter model)
 -- ============================================
+-- Existing document_chunks are cleared; users must re-upload documents.
 
--- Function to search for similar document chunks
--- This function respects RLS - only returns user's own chunks
+-- 1. Clear existing chunks (embeddings incompatible with new dimension)
+TRUNCATE public.document_chunks;
+
+-- 2. Drop IVFFlat index (required before column change)
+DROP INDEX IF EXISTS idx_document_chunks_embedding;
+
+-- 3. Change embedding column to 384 dimensions
+ALTER TABLE public.document_chunks DROP COLUMN embedding;
+ALTER TABLE public.document_chunks ADD COLUMN embedding vector(384);
+
+-- 4. Recreate IVFFlat index for similarity search
+CREATE INDEX idx_document_chunks_embedding
+  ON public.document_chunks
+  USING ivfflat (embedding vector_cosine_ops)
+  WITH (lists = 100);
+
+-- 5. Update match_documents function
 CREATE OR REPLACE FUNCTION public.match_documents(
   query_embedding vector(384),
   match_threshold FLOAT DEFAULT 0.7,
@@ -19,7 +34,7 @@ RETURNS TABLE (
   similarity FLOAT
 )
 LANGUAGE plpgsql
-SECURITY INVOKER  -- Uses caller's permissions (respects RLS)
+SECURITY INVOKER
 AS $$
 BEGIN
   RETURN QUERY
@@ -37,10 +52,7 @@ BEGIN
 END;
 $$;
 
--- Add comment
-COMMENT ON FUNCTION public.match_documents IS 'Search for document chunks similar to query embedding. Respects RLS.';
-
--- Function to search with document metadata included
+-- 6. Update match_documents_with_metadata function
 CREATE OR REPLACE FUNCTION public.match_documents_with_metadata(
   query_embedding vector(384),
   match_threshold FLOAT DEFAULT 0.7,
@@ -76,5 +88,4 @@ BEGIN
 END;
 $$;
 
--- Add comment
-COMMENT ON FUNCTION public.match_documents_with_metadata IS 'Search for similar chunks with document filename. Respects RLS.';
+COMMENT ON COLUMN public.document_chunks.embedding IS 'Vector embedding (384 dimensions for all-MiniLM-L6-v2)';

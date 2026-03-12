@@ -778,8 +778,8 @@ brew install ffmpeg                        # Required for audio conversion
 # OMP Error: "libiomp5.dylib already initialized" (macOS, Whisper/embedding)
 # Use make dev-gateway (sets KMP_DUPLICATE_LIB_OK), or add KMP_DUPLICATE_LIB_OK=TRUE to .env.local
 
-# Embedding model slow on first chat (RAG)
-# Orange/orange-nomic-v1.5-1536 downloads ~400MB on first use — wait 1–2 min
+# Embedding model (RAG)
+# all-MiniLM-L6-v2 ~80MB, fast load. Set EMBEDDING_LOCAL_ONLY=true after first run.
 ```
 
 ## Tech Stack

@@ -92,7 +92,9 @@ class Settings(BaseSettings):
 
     # ── RAG / Embeddings ─────────────────────────────────────
     rag_enabled: bool = True
-    embedding_model: str = "Orange/orange-nomic-v1.5-1536"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"  # 384 dims, ~80MB, fast load
+    embedding_local_only: bool = False  # Use cached model only (6–7x faster load); set True after first run
+    embedding_preload: bool = False  # Load embedding model at startup (trade startup time for faster first chat)
     rag_match_count: int = 5
     rag_match_threshold: float = 0.5
     rag_max_context_chars: int = 4000

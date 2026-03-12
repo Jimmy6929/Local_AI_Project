@@ -10,14 +10,14 @@ CREATE TABLE IF NOT EXISTS public.document_chunks (
   document_id UUID NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
-  embedding vector(1536),  -- OpenAI text-embedding-3-small dimensions
+  embedding vector(384),  -- all-MiniLM-L6-v2 dimensions
   chunk_index INTEGER NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
 -- Add comments
 COMMENT ON TABLE public.document_chunks IS 'Text chunks with embeddings for RAG vector search';
-COMMENT ON COLUMN public.document_chunks.embedding IS 'Vector embedding (1536 dimensions for OpenAI text-embedding-3-small)';
+COMMENT ON COLUMN public.document_chunks.embedding IS 'Vector embedding (384 dimensions for all-MiniLM-L6-v2)';
 
 -- Enable Row Level Security
 ALTER TABLE public.document_chunks ENABLE ROW LEVEL SECURITY;

@@ -220,11 +220,13 @@ async def send_message(
             messages[0]["content"] += f"\n\nWEB SEARCH RESULTS:\n{context_text}"
 
     # RAG: inject relevant document chunks (skip in conversation mode to avoid embedding load)
+    # Skip RAG entirely when user has no documents to avoid unnecessary embedding model load
     if not request.conversation_mode:
-        rag_chunks = await rag.retrieve_context(token, request.message)
-        if rag_chunks:
-            rag_text = rag.format_context(rag_chunks)
-            messages[0]["content"] += f"\n\nDOCUMENT CONTEXT:\n{rag_text}"
+        if await rag.user_has_documents(token):
+            rag_chunks = await rag.retrieve_context(token, request.message)
+            if rag_chunks:
+                rag_text = rag.format_context(rag_chunks)
+                messages[0]["content"] += f"\n\nDOCUMENT CONTEXT:\n{rag_text}"
 
     total_chars = sum(len(m.get("content", "")) for m in messages)
     print(f"[chat] Sending {len(messages)} messages ({total_chars} chars) to inference")
@@ -449,11 +451,13 @@ async def send_message_stream(
             messages[0]["content"] += f"\n\nWEB SEARCH RESULTS:\n{context_text}"
 
     # RAG: inject relevant document chunks (skip in conversation mode to avoid embedding load)
+    # Skip RAG entirely when user has no documents to avoid unnecessary embedding model load
     if not request.conversation_mode:
-        rag_chunks = await rag.retrieve_context(token, request.message)
-        if rag_chunks:
-            rag_text = rag.format_context(rag_chunks)
-            messages[0]["content"] += f"\n\nDOCUMENT CONTEXT:\n{rag_text}"
+        if await rag.user_has_documents(token):
+            rag_chunks = await rag.retrieve_context(token, request.message)
+            if rag_chunks:
+                rag_text = rag.format_context(rag_chunks)
+                messages[0]["content"] += f"\n\nDOCUMENT CONTEXT:\n{rag_text}"
 
     total_chars = sum(len(m.get("content", "")) for m in messages)
     print(f"[chat] Sending {len(messages)} messages ({total_chars} chars) to inference")

@@ -24,6 +24,29 @@ class RAGService:
         self.match_threshold = settings.rag_match_threshold
         self.max_context_chars = settings.rag_max_context_chars
 
+    async def user_has_documents(self, user_token: str) -> bool:
+        """
+        Check if the user has any document chunks (completed RAG documents).
+        Skips embedding load when user has no documents.
+        """
+        if not self.enabled:
+            return False
+        url = f"{self.settings.supabase_url}/rest/v1/document_chunks?select=id&limit=1"
+        headers = {
+            "apikey": self.settings.supabase_anon_key,
+            "Authorization": f"Bearer {user_token}",
+            "Prefer": "count=none",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+                rows = resp.json()
+                return len(rows) > 0
+        except Exception as exc:
+            print(f"[rag] user_has_documents check failed: {type(exc).__name__}: {exc}")
+            return False
+
     async def retrieve_context(
         self,
         user_token: str,
