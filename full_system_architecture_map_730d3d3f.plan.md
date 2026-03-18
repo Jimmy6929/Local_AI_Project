@@ -21,7 +21,7 @@ graph TB
         User["User (Browser)"]
     end
 
-    subgraph machine1 ["Machine 1 — MacBook Pro 2019 (100.99.189.104)"]
+    subgraph machine1 ["Machine 1 — MacBook Pro 2016 (100.99.189.104)"]
         WebApp["Next.js 16 Web App\n:3000"]
         Gateway["FastAPI Gateway\n:8000"]
         subgraph supabaseSvc [Supabase Docker Stack]
@@ -257,7 +257,7 @@ erDiagram
 ```mermaid
 graph LR
     subgraph tailnet [Tailscale VPN Mesh]
-        subgraph mbp2019 ["MacBook Pro 2019\n100.99.189.104"]
+        subgraph mbp2016 ["MacBook Pro 2016\n100.99.189.104"]
             next["Next.js :3000"]
             fastapi["FastAPI :8000"]
             supa["Supabase Docker\n:54321 / :54322 / :54323"]

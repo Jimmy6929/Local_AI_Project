@@ -235,7 +235,7 @@ mlx_vlm.server --host 0.0.0.0 --port 8080 \
 mlx_lm.server --host 0.0.0.0 --port 8081 --model mlx-community/Qwen3.5-4B-Instruct-4bit
 ```
 
-### Machine 2: MacBook 2019 (Home Server) — 4–5 terminals
+### Machine 2: MacBook Pro 2016 (Home Server) — 4–5 terminals
 
 **Terminal 1 — Supabase (start first, requires Docker Desktop)**
 
@@ -283,11 +283,11 @@ Verify at `http://localhost:8880/docs`. First pull downloads ~1 GB; subsequent s
 |---|----------|---------|---------|------|
 | 1 | Thinking LLM | M2 Pro | `mlx_vlm.server ...` | 8080 |
 | 2 | Instant LLM | M2 Pro | `mlx_lm.server ...` | 8081 |
-| 3 | Supabase | 2019 MacBook | `supabase start` | 54321-54323 |
-| 4 | Gateway API | 2019 MacBook | `python3 -m uvicorn ...` | 8000 |
-| 5 | Web App | 2019 MacBook | `npm run dev` | 3000 |
-| 6 | SearXNG | 2019 MacBook | `docker compose ... up -d` | 8888 |
-| 7 | Kokoro TTS | 2019 MacBook | `docker run ...` | 8880 |
+| 3 | Supabase | 2016 MacBook Pro | `supabase start` | 54321-54323 |
+| 4 | Gateway API | 2016 MacBook Pro | `python3 -m uvicorn ...` | 8000 |
+| 5 | Web App | 2016 MacBook Pro | `npm run dev` | 3000 |
+| 6 | SearXNG | 2016 MacBook Pro | `docker compose ... up -d` | 8888 |
+| 7 | Kokoro TTS | 2016 MacBook Pro | `docker run ...` | 8880 |
 
 > Terminals 2, 6, and 7 are optional. The core experience (chat with thinking mode) only needs terminals 1, 3, 4, and 5.
 
@@ -493,7 +493,7 @@ This project runs across **two machines** connected via Tailscale VPN:
 
 | Machine | Role | Tailscale IP |
 |---------|------|-------------|
-| **MacBook Pro 2019 (i7)** | Home Server: Gateway, Webapp, Supabase, SearXNG, Kokoro TTS | `100.99.189.104` |
+| **MacBook Pro 2016 (i7, 16 GB RAM)** | Home Server: Gateway, Webapp, Supabase, SearXNG, Kokoro TTS | `100.99.189.104` |
 | **MacBook Pro M2 Pro (16GB)** | GPU Machine: MLX inference servers (Thinking + Instant) | `100.104.193.59` |
 
 ```
@@ -658,7 +658,7 @@ curl http://localhost:8080/models         # List loaded VLM models
 curl http://localhost:8081/v1/models      # List loaded instant models
 ```
 
-### MacBook 2019 (Home Server)
+### MacBook Pro 2016 (Home Server)
 
 ```bash
 # ── One-Time Setup ──────────────────────────────────
@@ -740,10 +740,10 @@ git pull                                                  # On machine B
 ### Troubleshooting
 
 ```bash
-# "uvicorn: command not found" on 2019 MacBook
+# "uvicorn: command not found" on 2016 MacBook Pro
 python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000   # Use python3 -m prefix
 
-# "pip: command not found" on 2019 MacBook
+# "pip: command not found" on 2016 MacBook Pro
 pip3 install -r requirements.txt          # Use pip3 instead
 
 # Qwen3.5-9B fails with "Torchvision not found"
