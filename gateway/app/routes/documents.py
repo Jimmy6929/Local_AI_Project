@@ -15,7 +15,15 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.config import Settings, get_settings
 from app.middleware.auth import JWTPayload, get_current_user
-from app.models.documents import DocumentInfo, DocumentListResponse, UploadResponse
+from app.models.documents import (
+    AttachResponse,
+    DocumentInfo,
+    DocumentListResponse,
+    SessionAttachmentInfo,
+    SessionAttachmentListResponse,
+    UploadResponse,
+)
+from app.services.document_processor import extract_text
 from app.services.database import DatabaseService, get_database_service
 from app.services.document_processor import DocumentProcessor, get_document_processor
 
@@ -311,3 +319,189 @@ async def delete_document(
         _delete_from_storage(settings, storage_path)
     except Exception:
         pass  # file may already be gone
+
+
+# ── Session Attachment Endpoints ("Attach to Chat") ──────────────────────
+
+
+@router.post(
+    "/sessions/{session_id}/attach",
+    response_model=AttachResponse,
+    tags=["Session Attachments"],
+)
+async def attach_document_to_session(
+    session_id: str,
+    file: UploadFile = File(...),
+    user: JWTPayload = Depends(get_current_user),
+):
+    """
+    Attach a document to a chat session.
+
+    Extracts full text, stores it in session_documents.
+    The text is injected into the system prompt so the AI reads everything.
+    No embeddings or chunking — just full text.
+    """
+    settings = get_settings()
+    user_id = user.user_id
+    token = user.raw_token
+    max_chars = settings.session_doc_max_chars
+
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type: {content_type}. Allowed: {', '.join(ALLOWED_TYPES.values())}",
+        )
+
+    data = await file.read()
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large ({len(data)} bytes). Max: {MAX_FILE_SIZE} bytes",
+        )
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
+
+    filename = file.filename or "document"
+
+    # Verify the session belongs to this user
+    session_url = (
+        f"{settings.supabase_url}/rest/v1/chat_sessions"
+        f"?id=eq.{session_id}&user_id=eq.{user_id}&select=id"
+    )
+    with httpx.Client() as client:
+        resp = client.get(session_url, headers={
+            "apikey": settings.supabase_anon_key,
+            "Authorization": f"Bearer {token}",
+        })
+        resp.raise_for_status()
+        if not resp.json():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found",
+            )
+
+    # Extract text
+    try:
+        text = extract_text(data, content_type)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Text extraction failed: {exc}",
+        )
+
+    if not text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No text could be extracted from the document",
+        )
+
+    truncated = len(text) > max_chars
+    if truncated:
+        text = text[:max_chars]
+
+    # Insert into session_documents (use user token for RLS)
+    insert_url = f"{settings.supabase_url}/rest/v1/session_documents"
+    row = {
+        "session_id": session_id,
+        "user_id": user_id,
+        "filename": filename,
+        "content": text,
+        "file_size": len(data),
+    }
+    with httpx.Client() as client:
+        resp = client.post(insert_url, json=row, headers={
+            "apikey": settings.supabase_anon_key,
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        })
+        if not resp.is_success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to store attachment: {resp.text[:300]}",
+            )
+        created = resp.json()[0]
+
+    msg = "Document attached to session"
+    if truncated:
+        msg = (
+            f"Document truncated at {max_chars:,} chars. "
+            "For larger documents, use 'Add to Memory' for search-based retrieval."
+        )
+
+    return AttachResponse(
+        id=created["id"],
+        filename=filename,
+        content_length=len(text),
+        session_id=session_id,
+        truncated=truncated,
+        message=msg,
+    )
+
+
+@router.get(
+    "/sessions/{session_id}/attachments",
+    response_model=SessionAttachmentListResponse,
+    tags=["Session Attachments"],
+)
+async def list_session_attachments(
+    session_id: str,
+    user: JWTPayload = Depends(get_current_user),
+):
+    """List documents attached to a chat session."""
+    settings = get_settings()
+    token = user.raw_token
+
+    url = (
+        f"{settings.supabase_url}/rest/v1/session_documents"
+        f"?session_id=eq.{session_id}&user_id=eq.{user.user_id}"
+        f"&select=id,session_id,filename,file_size,created_at,content"
+        f"&order=created_at.asc"
+    )
+    with httpx.Client() as client:
+        resp = client.get(url, headers={
+            "apikey": settings.supabase_anon_key,
+            "Authorization": f"Bearer {token}",
+        })
+        resp.raise_for_status()
+        rows = resp.json()
+
+    return SessionAttachmentListResponse(
+        attachments=[
+            SessionAttachmentInfo(
+                id=r["id"],
+                session_id=r["session_id"],
+                filename=r["filename"],
+                content_length=len(r.get("content", "")),
+                file_size=r["file_size"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+    )
+
+
+@router.delete(
+    "/sessions/{session_id}/attachments/{attachment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Session Attachments"],
+)
+async def remove_session_attachment(
+    session_id: str,
+    attachment_id: str,
+    user: JWTPayload = Depends(get_current_user),
+):
+    """Remove a document attachment from a chat session."""
+    settings = get_settings()
+    token = user.raw_token
+
+    url = (
+        f"{settings.supabase_url}/rest/v1/session_documents"
+        f"?id=eq.{attachment_id}&session_id=eq.{session_id}&user_id=eq.{user.user_id}"
+    )
+    with httpx.Client() as client:
+        resp = client.delete(url, headers={
+            "apikey": settings.supabase_anon_key,
+            "Authorization": f"Bearer {token}",
+        })

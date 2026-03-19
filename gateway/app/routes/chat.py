@@ -21,6 +21,7 @@ from app.models.chat import (
     SessionListResponse,
     TTSRequest,
 )
+from app.config import get_settings
 from app.services.database import DatabaseService, get_database_service
 from app.services.inference import InferenceService, get_inference_service
 from app.services.web_search import WebSearchService, get_web_search_service
@@ -235,6 +236,43 @@ def _build_system_message(conversation_mode: bool = False) -> dict:
     }
 
 
+def _fetch_session_attachments(session_id: str, user_id: str, token: str) -> str:
+    """Fetch session_documents and format them for system prompt injection.
+
+    Returns an empty string if no attachments exist.
+    """
+    import httpx
+
+    settings = get_settings()
+    url = (
+        f"{settings.supabase_url}/rest/v1/session_documents"
+        f"?session_id=eq.{session_id}&user_id=eq.{user_id}"
+        f"&select=filename,content"
+        f"&order=created_at.asc"
+    )
+    with httpx.Client() as client:
+        resp = client.get(url, headers={
+            "apikey": settings.supabase_anon_key,
+            "Authorization": f"Bearer {token}",
+        })
+        if not resp.is_success:
+            print(f"[chat] Failed to fetch session attachments: {resp.status_code}")
+            return ""
+        rows = resp.json()
+
+    if not rows:
+        return ""
+
+    parts = ["ATTACHED DOCUMENTS (read by user request — use this as primary context):"]
+    for idx, row in enumerate(rows, 1):
+        content = row.get("content", "")
+        filename = row.get("filename", "document")
+        parts.append(f"\n[{idx}] {filename} ({len(content):,} chars)")
+        parts.append(content)
+
+    return "\n".join(parts)
+
+
 def _extract_thinking(content: str) -> Optional[str]:
     """Extract thinking block text from raw content, if present."""
     m = _THINK_RE.search(content)
@@ -325,7 +363,12 @@ async def send_message(
         {"role": msg["role"], "content": msg["content"]}
         for msg in history
     ]
-    
+
+    # Session attachments: inject full document text (highest priority context)
+    attach_text = _fetch_session_attachments(session_id, user_id, token)
+    if attach_text:
+        messages[0]["content"] += f"\n\n{attach_text}"
+
     # Web search: inject real-time results into context
     search_results = []
     if web_search.should_search(request.message):
@@ -566,6 +609,11 @@ async def send_message_stream(
         {"role": msg["role"], "content": msg["content"]}
         for msg in history
     ]
+
+    # Session attachments: inject full document text (highest priority context)
+    attach_text = _fetch_session_attachments(session_id, user_id, token)
+    if attach_text:
+        messages[0]["content"] += f"\n\n{attach_text}"
 
     # Web search: run before streaming so results are ready
     search_results = []

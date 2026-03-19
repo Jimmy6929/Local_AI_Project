@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     rag_chunk_size: int = 512
     rag_chunk_overlap: int = 50
 
+    # ── Session Document Attachments ──────────────────────────────
+    session_doc_max_chars: int = 12000  # max extracted text per attachment
+
     # Database URL (for direct connections if needed)
     database_url: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
     

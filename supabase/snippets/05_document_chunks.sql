@@ -42,10 +42,9 @@ CREATE POLICY "Users can delete their own chunks"
 CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id ON public.document_chunks(document_id, chunk_index);
 CREATE INDEX IF NOT EXISTS idx_document_chunks_user_id ON public.document_chunks(user_id);
 
--- IVFFlat index for vector similarity search
--- Note: This index works best with existing data. Re-run after loading data.
--- Lists parameter should be ~sqrt(row_count), start with 100
-CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding 
-  ON public.document_chunks 
-  USING ivfflat (embedding vector_cosine_ops)
-  WITH (lists = 100);
+-- HNSW index for vector similarity search
+-- Unlike IVFFlat, HNSW works correctly even on an empty table.
+CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding
+  ON public.document_chunks
+  USING hnsw (embedding vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);

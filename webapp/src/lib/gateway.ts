@@ -448,3 +448,73 @@ export async function deleteDocument(
     },
   });
 }
+
+// ── Session Attachments ("Attach to Chat") ──────────────────────────────
+
+export interface SessionAttachmentInfo {
+  id: string;
+  session_id: string;
+  filename: string;
+  content_length: number;
+  file_size: number;
+  truncated: boolean;
+  created_at: string;
+}
+
+export interface AttachResponse {
+  id: string;
+  filename: string;
+  content_length: number;
+  session_id: string;
+  truncated: boolean;
+  message: string;
+}
+
+export async function attachDocumentToSession(
+  token: string,
+  sessionId: string,
+  file: File
+): Promise<AttachResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(
+    `${GATEWAY_URL}/documents/sessions/${sessionId}/attach`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Attach error ${res.status}: ${errText}`);
+  }
+
+  return res.json();
+}
+
+export async function listSessionAttachments(
+  token: string,
+  sessionId: string
+): Promise<{ attachments: SessionAttachmentInfo[] }> {
+  return apiCall<{ attachments: SessionAttachmentInfo[] }>(
+    `/documents/sessions/${sessionId}/attachments`,
+    token
+  );
+}
+
+export async function removeSessionAttachment(
+  token: string,
+  sessionId: string,
+  attachmentId: string
+): Promise<void> {
+  await fetch(
+    `${GATEWAY_URL}/documents/sessions/${sessionId}/attachments/${attachmentId}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+}

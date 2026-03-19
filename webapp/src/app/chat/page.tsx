@@ -12,10 +12,14 @@ import {
   uploadDocument,
   listDocuments,
   deleteDocument,
+  attachDocumentToSession,
+  listSessionAttachments,
+  removeSessionAttachment,
   type SessionInfo,
   type ChatMessage,
   type SearchSource,
   type DocumentInfo,
+  type SessionAttachmentInfo,
 } from "@/lib/gateway";
 import {
   useSpeechRecognition,
@@ -80,11 +84,16 @@ export default function ChatPage() {
   const [docUploading, setDocUploading] = useState(false);
   const [docToast, setDocToast] = useState<string | null>(null);
 
+  // ── Session Attachments ("Attach to Chat") ────────────────────────────
+  const [attachments, setAttachments] = useState<SessionAttachmentInfo[]>([]);
+  const [attachUploading, setAttachUploading] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docFileInputRef = useRef<HTMLInputElement>(null);
+  const attachFileInputRef = useRef<HTMLInputElement>(null);
   const isStreamingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const userScrolledUpRef = useRef(false);
@@ -229,6 +238,54 @@ export default function ChatPage() {
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
     } catch (err) {
       console.error("Delete document error:", err);
+    }
+  }
+
+  // ── Session Attachment handlers ────────────────────────────────────────
+
+  const loadAttachments = useCallback(async (sessionId: string) => {
+    if (!token || !sessionId) { setAttachments([]); return; }
+    try {
+      const data = await listSessionAttachments(token, sessionId);
+      setAttachments(data.attachments);
+    } catch (err) {
+      console.error("Failed to load attachments:", err);
+      setAttachments([]);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (activeSessionId) loadAttachments(activeSessionId);
+    else setAttachments([]);
+  }, [activeSessionId, loadAttachments]);
+
+  async function handleAttach(file: File) {
+    if (!token || !activeSessionId) {
+      setDocToast("Start a conversation first, then attach a file.");
+      setTimeout(() => setDocToast(null), 4000);
+      return;
+    }
+    setAttachUploading(true);
+    setDocToast(`Attaching ${file.name}...`);
+    try {
+      const result = await attachDocumentToSession(token, activeSessionId, file);
+      setDocToast(result.truncated ? result.message : `${result.filename} attached (${result.content_length.toLocaleString()} chars)`);
+      loadAttachments(activeSessionId);
+    } catch (err) {
+      setDocToast(`Attach failed: ${err instanceof Error ? err.message : "unknown error"}`);
+    } finally {
+      setAttachUploading(false);
+      setTimeout(() => setDocToast(null), 5000);
+    }
+  }
+
+  async function handleRemoveAttachment(attachmentId: string) {
+    if (!token || !activeSessionId) return;
+    try {
+      await removeSessionAttachment(token, activeSessionId, attachmentId);
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+    } catch (err) {
+      console.error("Remove attachment error:", err);
     }
   }
 
@@ -693,6 +750,33 @@ export default function ChatPage() {
               </div>
             )}
 
+            {/* Attached files chips */}
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2 animate-fade-in">
+                {attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#00ff41]/10 border border-[#00ff41]/20 text-[11px] text-[#00ff41] group"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                    <span className="truncate max-w-[140px]">{att.filename}</span>
+                    <span className="text-[9px] text-[#00ff41]/60">{(att.content_length / 1000).toFixed(1)}k</span>
+                    <button
+                      onClick={() => handleRemoveAttachment(att.id)}
+                      className="text-[#00ff41]/40 hover:text-[#ff4444] transition-colors ml-0.5"
+                      title="Remove attachment"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="glass rounded-2xl p-2 flex items-end gap-2 transition-all">
               {/* Image upload */}
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
@@ -701,6 +785,33 @@ export default function ChatPage() {
                   <rect x="3" y="3" width="18" height="18" rx="4" />
                   <circle cx="8.5" cy="8.5" r="1.5" />
                   <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                </svg>
+              </button>
+
+              {/* Attach document to chat */}
+              <input
+                ref={attachFileInputRef}
+                type="file"
+                accept=".txt,.md,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleAttach(f);
+                  e.target.value = "";
+                }}
+                className="hidden"
+              />
+              <button
+                onClick={() => attachFileInputRef.current?.click()}
+                disabled={attachUploading}
+                className={`p-2 rounded-xl transition-all shrink-0 ${
+                  attachments.length > 0
+                    ? "text-[#00ff41] hover:bg-[#00ff41]/10"
+                    : "text-[#999] hover:text-[#00ff41] hover:bg-white/[0.06]"
+                } disabled:opacity-40`}
+                title={attachUploading ? "Attaching..." : "Attach file to chat"}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                 </svg>
               </button>
 
