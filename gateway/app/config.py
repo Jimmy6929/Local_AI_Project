@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     web_search_timeout: float = 5.0
     web_search_max_results: int = 6
     web_search_snippet_max_chars: int = 800
+    web_search_fetch_full_content: bool = True
+    web_search_full_content_count: int = 3
+    web_search_full_content_max_chars: int = 2000
+    web_search_full_content_timeout: float = 4.0
 
     # ── RAG / Embeddings ─────────────────────────────────────
     rag_enabled: bool = True

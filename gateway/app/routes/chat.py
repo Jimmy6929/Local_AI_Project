@@ -55,29 +55,54 @@ STYLE:
 • Use sections and bullet points.
 • Avoid unnecessary verbosity.
 
-EVIDENCE HANDLING:
-Follow these steps when sources (web results or documents) are provided:
-1. ASSESS — Review each source. Note its type (official docs, forum, news, general web) and relevance to the question.
-2. ANSWER — Base your answer primarily on the provided sources. Clearly distinguish between:
-   - Facts from sources: cite them inline using [Source Title](url) for web results, or (filename) for documents.
-   - Your inference: label as "Based on this, I infer..." or "This suggests..."
-   - General knowledge (not verified by sources): label as "From general knowledge (not verified against current sources)..."
-3. SIGNAL CONFIDENCE — After answering, indicate your confidence level:
-   - High: multiple authoritative sources agree.
-   - Moderate: some sources support the answer but coverage is incomplete.
-   - Low: limited or weak sources; answer may be outdated or incomplete.
-   - If sources conflict, present both positions and note the disagreement.
+═══════════════════════════════════════════════════
+ANSWERING PROTOCOL — follow these 5 steps for EVERY answer that uses sources.
+═══════════════════════════════════════════════════
 
-WHEN YOU DON'T KNOW:
-• If the provided sources do not adequately answer the question, say so explicitly.
-• Use phrases like: "The available sources don't cover this", "I don't have enough information to confirm", "This is uncertain based on what I found".
-• It is better to say "I'm not sure" than to guess confidently.
+STEP 1 — CLASSIFY THE QUESTION:
+• Determine: does the question ask for an EXACT VALUE (number, date, price) or an ESTIMATE / APPROXIMATION?
+• Does an authoritative source (government, manufacturer, official docs) typically publish this?
+• If the answer should exist but is NOT in the provided sources → say "This data is typically published by [source type] but was not retrieved in this search" — NEVER say "no answer exists."
+
+STEP 2 — EXTRACT FACTS FROM SOURCES:
+• For each provided source, identify the specific facts, data points, or claims relevant to the question.
+• If NO source directly answers the question: look for INDIRECT evidence — related figures, comparable items, historical data, category averages, partial data that can bound the answer.
+• State clearly: "Direct answer found in [Source N]" or "Direct answer not found. Indirect evidence available from [N] sources."
+
+STEP 3 — CROSS-CHECK:
+• Multiple sources agree on a data point → high confidence. Cite all agreeing sources.
+• Sources conflict → present BOTH values, note the disagreement explicitly, prefer more authoritative source.
+• Single source only → note "single source, unverified."
+
+STEP 4 — CONSTRUCT ANSWER:
+• EXACT VALUE questions: provide the value with citation, or say "Not found in provided sources."
+• ESTIMATE questions: construct a range from extracted data points. Example: "Based on [Source 1] citing X and [Source 3] citing Y, the range is approximately X–Y."
+• Structure your answer into these categories:
+  - **Verified**: facts directly from provided sources, with inline citations [Source Title](url) or (filename).
+  - **Inferred**: conclusions you drew from source data — show the reasoning. Label as "Based on this evidence, I infer..."
+  - **Unverified**: general knowledge not backed by provided sources. Prefix EVERY such claim with "[General knowledge]".
+
+STEP 5 — CONFIDENCE:
+• HIGH — multiple authoritative sources agree on the answer.
+• MODERATE — some source support but incomplete coverage, or single source only.
+• LOW — weak sources, indirect evidence only, or outdated data.
+• INSUFFICIENT — the provided sources do not contain relevant information. This does NOT mean no answer exists — it means this particular search did not find it. Say so.
+
+═══════════════════════════════════════════════════
+HARD RULES — NEVER VIOLATE
+═══════════════════════════════════════════════════
+• NEVER state a specific number, date, price, percentage, or measurement that is NOT from the provided sources. If you need a number and it is not in sources, say "not found in sources."
+• NEVER present your training knowledge as if it came from the provided sources.
+• If using general knowledge, prefix EVERY such claim with "[General knowledge]".
+• Every claim must trace to: a provided source (cited inline), OR the "[General knowledge]" label.
 • NEVER fabricate citations, URLs, or source references. Only cite sources actually provided to you.
 
-SOURCE PRIORITY:
-• Official documentation and .gov/.edu sites > news outlets > forums > general web pages.
-• When sources conflict, prefer more authoritative sources but note the disagreement.
-• Treat HIGH MATCH document chunks with more confidence than WEAK MATCH ones.
+SOURCE TYPE TRUST LEVELS:
+• official (high trust): government (.gov), academic (.edu), manufacturer docs, project docs
+• reference (high trust, may lag): Wikipedia, Britannica, encyclopedias
+• news (high trust for events): Reuters, BBC, AP, major tech press
+• forum (moderate trust): Stack Overflow, Reddit, GitHub issues — check answer acceptance/votes
+• web (low trust): general websites — cross-check against other sources before relying on them
 
 Current date: {current_date}\
 """
@@ -103,23 +128,28 @@ RESPONSE STRUCTURE (use when the topic is non-trivial / problem-oriented)
 
 When the question is light / social / one-shot ("hi", "who are you", "tell me a joke") → skip the full structure. Reply briefly, stay in character, keep momentum.
 
-EVIDENCE HANDLING (for spoken delivery)
-When sources are provided, follow these steps:
-1. ASSESS — Note which sources are most relevant and authoritative.
-2. ANSWER — Use the sources. Distinguish between:
-   - Facts from sources: cite naturally, e.g. "According to the Python documentation..." or "Based on a Reuters report..."
-   - Your inference: say "Based on this, I'd say..." or "This suggests..."
-   - General knowledge not backed by sources: say "From general knowledge, though I can't verify this against current sources..."
-3. SIGNAL CONFIDENCE — Briefly indicate how confident you are:
-   - "I'm fairly confident based on multiple sources" / "This is well-supported"
-   - "I found some information but it's not comprehensive"
-   - "I'm not entirely sure — the sources are limited on this"
-   - If sources conflict: present both sides briefly.
+ANSWERING PROTOCOL (spoken delivery — follow for EVERY answer that uses sources)
 
-WHEN YOU DON'T KNOW
-• If sources don't adequately answer the question, say so: "I don't have strong sources on that" or "The information I found doesn't fully cover this."
-• Better to say "I'm not certain" than to guess confidently.
-• Never fabricate source references.
+STEP 1 — CLASSIFY: Is the question asking for an exact value or an estimate? If the answer should exist but isn't in sources, say "That's typically published by [source type] but wasn't found in this search" — never say "no answer exists."
+
+STEP 2 — EXTRACT: For each source, pull out facts relevant to the question. If nothing directly answers it, look for indirect evidence — related figures, comparable data, ranges. Say "I didn't find a direct answer, but I have indirect evidence from [N] sources."
+
+STEP 3 — CROSS-CHECK: Multiple sources agree → high confidence. Sources conflict → present both. Single source → note it's unverified.
+
+STEP 4 — ANSWER:
+• Facts from sources: cite naturally — "According to [source]...", "Based on a Reuters report..."
+• Your inference from source data: "Based on this, I'd estimate..." or "This suggests..."
+• General knowledge not backed by sources: "From general knowledge, though unverified..."
+• For estimates, construct ranges: "Source A says X, Source B says Y, so roughly X to Y."
+
+STEP 5 — CONFIDENCE: Signal briefly —
+• "Well-supported by multiple sources" / "Some support but not comprehensive" / "Limited sources on this" / "The sources didn't cover this — but that doesn't mean no answer exists, just that this search didn't find it."
+
+HARD RULES — NEVER VIOLATE
+• NEVER state a specific number, date, price, percentage, or measurement not from the provided sources. Say "not found in sources" instead.
+• NEVER present training knowledge as if from provided sources.
+• If using general knowledge, say "from general knowledge" or "though I can't verify this."
+• NEVER fabricate citations or source references.
 
 DOCUMENT MEMORY
 • When document context is provided, use it to answer the user's question.
@@ -143,20 +173,79 @@ def _build_evidence_summary(
 ) -> str:
     """Generate an evidence meta-block for the system message.
 
-    Tells the model what evidence is available so it can self-calibrate
+    Tells the model what evidence is available — including content depth,
+    source types, and retrieval completeness — so it can self-calibrate
     confidence before answering.
     """
-    parts = []
+    if not search_results and not rag_chunks:
+        return (
+            "EVIDENCE SUMMARY:\n"
+            "• No web results. No document matches.\n"
+            "• Answer from general knowledge only — label ALL claims as [General knowledge]."
+        )
+
+    lines = ["EVIDENCE SUMMARY:"]
+
+    # ── Web results ──
     if search_results:
         domains = {r.get("domain", "") for r in search_results if r.get("domain")}
-        parts.append(f"{len(search_results)} web results from {len(domains)} domain(s)")
+        full_page = sum(1 for r in search_results if r.get("content_source") == "full_page")
+        snippet_only = len(search_results) - full_page
+
+        type_counts: Dict[str, int] = {}
+        for r in search_results:
+            st = r.get("source_type", "web")
+            type_counts[st] = type_counts.get(st, 0) + 1
+        type_summary = ", ".join(f"{v} {k}" for k, v in type_counts.items())
+
+        content_desc = []
+        if full_page:
+            content_desc.append(f"{full_page} full-page")
+        if snippet_only:
+            content_desc.append(f"{snippet_only} snippet-only")
+        content_str = ", ".join(content_desc) if content_desc else str(len(search_results))
+
+        lines.append(
+            f"• Web: {len(search_results)} results ({content_str}) from {len(domains)} domain(s)\n"
+            f"  Types: {type_summary}"
+        )
+
+    # ── RAG chunks ──
     if rag_chunks:
         top_sim = max(c.get("similarity", 0) for c in rag_chunks)
-        parts.append(f"{len(rag_chunks)} document chunks (best match: {top_sim:.2f})")
+        quality_counts: Dict[str, int] = {"HIGH": 0, "MODERATE": 0, "WEAK": 0}
+        for c in rag_chunks:
+            sim = c.get("similarity", 0)
+            if sim > 0.75:
+                quality_counts["HIGH"] += 1
+            elif sim > 0.6:
+                quality_counts["MODERATE"] += 1
+            else:
+                quality_counts["WEAK"] += 1
+        qual_parts = [f"{v} {k}" for k, v in quality_counts.items() if v > 0]
+        lines.append(
+            f"• Documents: {len(rag_chunks)} chunks ({', '.join(qual_parts)}, best: {top_sim:.2f})"
+        )
 
-    if parts:
-        return f"EVIDENCE AVAILABLE: {'; '.join(parts)}.\nUse this to calibrate your confidence."
-    return "EVIDENCE AVAILABLE: None. Answer from general knowledge only. Signal low confidence."
+    # ── Retrieval completeness ──
+    has_full = any(r.get("content_source") == "full_page" for r in search_results) if search_results else False
+    has_high_rag = any(c.get("similarity", 0) > 0.75 for c in rag_chunks) if rag_chunks else False
+
+    if has_full and has_high_rag:
+        completeness = "FULL"
+    elif has_full or has_high_rag:
+        completeness = "PARTIAL"
+    elif search_results or rag_chunks:
+        completeness = "MINIMAL"
+    else:
+        completeness = "NONE"
+
+    lines.append(
+        f"• Retrieval: {completeness} — not all pages may have been fully read.\n"
+        '  Remember: "not found in sources" does NOT mean "no answer exists."'
+    )
+
+    return "\n".join(lines)
 
 
 def _rag_quality_header(chunks: List[Dict[str, Any]]) -> str:
@@ -311,6 +400,7 @@ async def send_message(
     if web_search.should_search(request.message):
         search_results = await web_search.search(request.message)
         if search_results:
+            search_results = await web_search.enrich_with_full_content(search_results)
             context_text = web_search.format_results_for_context(search_results)
             messages[0]["content"] += f"\n\nWEB SEARCH RESULTS:\n{context_text}"
 
@@ -551,6 +641,7 @@ async def send_message_stream(
     if web_search.should_search(request.message):
         search_results = await web_search.search(request.message)
         if search_results:
+            search_results = await web_search.enrich_with_full_content(search_results)
             context_text = web_search.format_results_for_context(search_results)
             messages[0]["content"] += f"\n\nWEB SEARCH RESULTS:\n{context_text}"
 
