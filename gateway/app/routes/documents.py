@@ -127,6 +127,11 @@ def _insert_chunks(settings: Settings, chunks: List[dict]):
     url = f"{settings.supabase_url}/rest/v1/document_chunks"
     with httpx.Client(timeout=120.0) as client:
         resp = client.post(url, json=chunks, headers=_db_headers_service(settings))
+        if resp.status_code == 400 and "dimension" in resp.text.lower():
+            raise ValueError(
+                f"Vector dimension mismatch: embedding model and DB column disagree. "
+                f"Apply the 1536-dim migration. Supabase: {resp.text[:200]}"
+            )
         resp.raise_for_status()
 
 

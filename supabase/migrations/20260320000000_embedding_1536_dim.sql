@@ -17,7 +17,8 @@ ALTER TABLE public.document_chunks ADD COLUMN embedding vector(1536);
 -- 4. Recreate HNSW index for similarity search
 CREATE INDEX idx_document_chunks_embedding
   ON public.document_chunks
-  USING hnsw (embedding vector_cosine_ops);
+  USING hnsw (embedding vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
 
 -- 5. Update match_documents function
 CREATE OR REPLACE FUNCTION public.match_documents(
