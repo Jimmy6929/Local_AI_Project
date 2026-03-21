@@ -9,7 +9,7 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/jimmy/Documents/App-project/Local_AI_Project/scripts/auto-pull.sh</string>
+        <string>__REPO_DIR__/scripts/auto-pull.sh</string>
     </array>
 
     <key>StartInterval</key>
@@ -19,13 +19,13 @@
     <integer>10</integer>
 
     <key>WorkingDirectory</key>
-    <string>/Users/jimmy/Documents/App-project/Local_AI_Project</string>
+    <string>__REPO_DIR__</string>
 
     <key>StandardOutPath</key>
-    <string>/Users/jimmy/Documents/App-project/Local_AI_Project/logs/auto-pull-stdout.log</string>
+    <string>__REPO_DIR__/logs/auto-pull-stdout.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/jimmy/Documents/App-project/Local_AI_Project/logs/auto-pull-stderr.log</string>
+    <string>__REPO_DIR__/logs/auto-pull-stderr.log</string>
 
     <key>RunAtLoad</key>
     <true/>
@@ -35,7 +35,7 @@
         <key>PATH</key>
         <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
         <key>HOME</key>
-        <string>/Users/jimmy</string>
+        <string>__HOME_DIR__</string>
     </dict>
 </dict>
 </plist>

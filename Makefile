@@ -179,7 +179,8 @@ autopull-install:
 	chmod +x scripts/auto-pull.sh
 	mkdir -p logs
 	-launchctl unload ~/Library/LaunchAgents/com.jimmy.localai.autopull.plist 2>/dev/null
-	cp scripts/com.jimmy.localai.autopull.plist ~/Library/LaunchAgents/
+	sed -e 's|__REPO_DIR__|$(CURDIR)|g' -e 's|__HOME_DIR__|$(HOME)|g' \
+		scripts/com.jimmy.localai.autopull.plist > ~/Library/LaunchAgents/com.jimmy.localai.autopull.plist
 	launchctl load ~/Library/LaunchAgents/com.jimmy.localai.autopull.plist
 	@echo "✅ Auto-pull service installed and running (polls every 60s)"
 

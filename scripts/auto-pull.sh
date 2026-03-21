@@ -3,13 +3,15 @@
 # Designed to run every 60s via launchd on the MacBook Pro 2016 home server.
 # Errors are handled explicitly per-command (no set -euo pipefail).
 
-REPO_DIR="/Users/jimmy/Documents/App-project/Local_AI_Project"
+# Derive repo dir from this script's location (works on any machine)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 LOG_DIR="$REPO_DIR/logs"
 LOG_FILE="$LOG_DIR/auto-pull.log"
 BRANCH="main"
 
 # Ensure HOME is set (launchd may not provide it)
-export HOME="${HOME:-/Users/jimmy}"
+export HOME="${HOME:-$(dscl . -read /Users/$(whoami) NFSHomeDirectory | awk '{print $2}')}"
 
 # Git HTTP timeouts — fail fast instead of hanging forever
 export GIT_HTTP_LOW_SPEED_LIMIT=1000
