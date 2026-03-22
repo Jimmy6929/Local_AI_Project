@@ -1,6 +1,6 @@
 # Local AI Assistant
 
-A private, self-hosted AI assistant system with multi-user support, three-tier inference, voice conversation, web search, and full data ownership.
+A private, self-hosted AI assistant system with multi-user support, three-tier inference, voice conversation, web search, RAG document memory, image understanding, and full data ownership.
 
 ## Overview
 
@@ -8,9 +8,11 @@ Local AI Assistant is a production-ready chat application that provides a ChatGP
 
 - **Three Inference Modes**: Instant (fast), Thinking (chain-of-thought), and Think Harder (extended reasoning)
 - **SSE Streaming**: Real-time token-by-token response streaming with thinking block support
+- **Image Understanding (Vision)**: Attach images via file picker, paste, or drag-and-drop — the AI analyzes them using Qwen 3.5's built-in vision encoder
+- **RAG Document Memory ("Brain")**: Upload documents (PDF, DOCX, TXT, MD) for persistent knowledge — hybrid vector + BM25 search, cross-encoder reranking, contextual retrieval
 - **Voice Conversation ("Alfred")**: Wake-word activation, speech-to-text (Whisper), text-to-speech (Kokoro), and speaker verification
-- **Web Search**: Self-hosted SearXNG integration — the AI can search the web and cite sources
-- **Full Data Ownership**: All conversations and documents stored in your Supabase instance
+- **Web Search**: Self-hosted SearXNG integration with LLM-powered intent classification — the AI decides when to search, fetches full-page content, and cites sources
+- **Full Data Ownership**: All conversations, documents, and images stored in your Supabase instance
 - **Multi-User Ready**: Row-level security (RLS) enabled from day one
 - **No Third-Party LLM Costs**: Use your own GPU infrastructure for inference
 
@@ -23,6 +25,7 @@ Local AI Assistant is a production-ready chat application that provides a ChatGP
 │  │              Web App (Next.js 16)                       │   │
 │  │  - Chat UI (Streaming)    - Deep Think Toggle           │   │
 │  │  - Session History        - Voice / Alfred Mode         │   │
+│  │  - Image Upload/Paste     - Document Brain (RAG)        │   │
 │  │  - Auth via Supabase      - Web Search Sources          │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
@@ -36,6 +39,7 @@ Local AI Assistant is a production-ready chat application that provides a ChatGP
 │  │  - JWT Validation      - Session Management             │   │
 │  │  - Request Routing     - SSE Streaming                  │   │
 │  │  - Web Search (SearXNG)- Voice (STT + TTS + Speaker)    │   │
+│  │  - RAG Pipeline        - Image/Vision Handling          │   │
 │  │  - Logging & Audit     - Cost Controls                  │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
@@ -53,9 +57,9 @@ Local AI Assistant is a production-ready chat application that provides a ChatGP
 │                       DATA LAYER                                │
 │  ┌─────────────────────────────────────────────────────────┐   │
 │  │              Supabase                                   │   │
-│  │  - Auth (Users, JWT)     - Storage (Documents)          │   │
-│  │  - Postgres (Data)       - pgvector (Embeddings)        │   │
-│  │  - RLS (Multi-tenant)                                   │   │
+│  │  - Auth (Users, JWT)     - Storage (Documents + Images)  │   │
+│  │  - Postgres (Data)       - pgvector (RAG Embeddings)    │   │
+│  │  - RLS (Multi-tenant)    - BM25 Full-Text Search        │   │
 │  └─────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -79,11 +83,18 @@ Local_AI_Project/
 │   │   │   └── chat.py              # Pydantic models (ChatRequest, TTSRequest, etc.)
 │   │   ├── routes/
 │   │   │   ├── health.py            # Health endpoints (/health, /health/auth, /health/inference)
-│   │   │   └── chat.py              # Chat, voice, TTS, streaming endpoints
+│   │   │   ├── chat.py              # Chat, voice, TTS, vision, streaming endpoints
+│   │   │   └── documents.py         # Document upload, RAG management, session attachments
 │   │   └── services/
-│   │       ├── inference.py          # LLM inference (instant/thinking/thinking_harder)
-│   │       ├── database.py           # Supabase REST client (sessions, messages, profiles)
-│   │       ├── web_search.py         # SearXNG web search integration
+│   │       ├── inference.py          # LLM inference (instant/thinking/thinking_harder, multimodal)
+│   │       ├── database.py           # Supabase REST client (sessions, messages, images, profiles)
+│   │       ├── web_search.py         # SearXNG web search with LLM intent classification
+│   │       ├── rag.py                # RAG pipeline (hybrid search, RRF fusion)
+│   │       ├── reranker.py           # Cross-encoder reranking (ms-marco-MiniLM)
+│   │       ├── context_generator.py  # Contextual retrieval (LLM chunk prefixes)
+│   │       ├── embedding.py          # Embedding service (sentence-transformers)
+│   │       ├── document_processor.py # Document parsing (PDF, DOCX, TXT, MD) + chunking
+│   │       ├── rag_eval.py           # RAG metrics (hit rate, MRR, latency)
 │   │       ├── transcription.py      # Speech-to-text (faster-whisper, tiny model)
 │   │       └── speaker.py            # Voice enrollment & speaker verification (MFCC)
 │   ├── tests/                        # Pytest test suite
@@ -159,10 +170,41 @@ A full voice loop with wake-word activation:
 
 Voice profiles are stored locally at `~/.local-ai/voice-profiles/`.
 
+### Image Understanding (Vision)
+
+Attach an image to any message — the AI analyzes it using Qwen 3.5's built-in vision encoder.
+
+- **Three input methods**: File picker button, clipboard paste (Ctrl+V), drag-and-drop
+- **Auto-compression**: Images resized to max 1024px before sending (prevents OOM on 16GB)
+- **Auto-routing**: Image messages force the thinking tier (vision-capable model)
+- **Storage**: Images stored in Supabase Storage (`chat-images` bucket), metadata in `message_images` table
+- **History**: Images display inline in chat history; older images shown as `[Image was attached]` in model context
+- **Supported types**: JPEG, PNG, GIF, WebP (max 5MB)
+
+### RAG Document Memory ("Brain")
+
+Upload documents for persistent knowledge retrieval across all conversations.
+
+- **Document upload**: PDF, DOCX, TXT, MD (up to 50MB) via `POST /documents/upload`
+- **Processing pipeline**: Extract text → chunk with overlap (1024 chars, 128 overlap) → generate embeddings
+- **Hybrid search**: 70% vector similarity (pgvector cosine) + 30% BM25 full-text (PostgreSQL tsvector) with RRF fusion
+- **Cross-encoder reranking**: ms-marco-MiniLM-L6-v2 reranks top-20 → top-5 for precision
+- **Contextual retrieval**: LLM generates context prefixes per chunk during upload for better embedding quality
+- **Embedding model**: Orange/orange-nomic-v1.5-1536 (1536 dimensions)
+- **Session attachments**: "Attach to chat" uploads inject full document text into the current session only (no chunking/embedding)
+- **Quality metrics**: Hit rate, MRR, per-query latency logging
+- **Evidence summary**: Model receives structured metadata about retrieval quality for confidence calibration
+
 ### Web Search (SearXNG)
 
 - Self-hosted SearXNG instance (Docker) — no API keys needed
-- Gateway auto-detects when a question needs web results (skips greetings/trivial messages)
+- **Three-tier intent classification**:
+  - Auto-skip: greetings, code questions, creative writing (~20 patterns)
+  - Auto-search: temporal queries, news, weather, stock prices (~15 patterns)
+  - LLM-classify: ambiguous queries decided by instant-tier LLM (3-token budget)
+- **Full-page content fetching**: Top 3 results fetched via trafilatura (2000 chars each)
+- **Source trust classification**: Official (.gov, docs) > Reference > Forum > News > Web
+- **Duplicate detection**: Jaccard similarity filtering (60% threshold)
 - Search results injected into the LLM system prompt with source URLs
 - Frontend shows cited sources below the AI response
 - Engines: Google, DuckDuckGo, Brave, Wikipedia
@@ -366,12 +408,26 @@ docker stop $(docker ps -q --filter ancestor=ghcr.io/remsky/kokoro-fastapi-cpu:l
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/chat` | POST | Yes | Send message, receive full AI response |
-| `/chat/stream` | POST | Yes | Send message, receive SSE-streamed response |
+| `/chat` | POST | Yes | Send message (with optional image), receive full AI response |
+| `/chat/stream` | POST | Yes | Send message (with optional image), receive SSE-streamed response |
 | `/chat/sessions` | GET | Yes | List user's chat sessions |
-| `/chat/sessions/{id}/messages` | GET | Yes | Get messages in a session |
+| `/chat/sessions/create` | POST | Yes | Create an empty session (for attaching docs before first message) |
+| `/chat/sessions/{id}/messages` | GET | Yes | Get messages in a session (includes `image_id` for messages with images) |
 | `/chat/sessions/{id}` | PATCH | Yes | Rename a session |
 | `/chat/sessions/{id}` | DELETE | Yes | Delete a session and its messages |
+| `/chat/images/{id}` | GET | Yes | Serve a chat image from Supabase Storage |
+| `/chat/sessions/{id}/images` | GET | Yes | Get image metadata for all messages in a session |
+
+### Document Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/documents/upload` | POST | Yes | Upload a document for RAG (PDF, DOCX, TXT, MD) |
+| `/documents` | GET | Yes | List user's uploaded documents |
+| `/documents/{id}` | DELETE | Yes | Delete a document and its chunks |
+| `/documents/sessions/{id}/attach` | POST | Yes | Attach a document to a chat session |
+| `/documents/sessions/{id}/attachments` | GET | Yes | List attachments for a session |
+| `/documents/sessions/{id}/attachments/{att_id}` | DELETE | Yes | Remove a session attachment |
 
 ### Voice Endpoints
 
@@ -390,9 +446,12 @@ docker stop $(docker ps -q --filter ancestor=ghcr.io/remsky/kokoro-fastapi-cpu:l
   "session_id": "uuid | null",
   "message": "string",
   "mode": "instant | thinking | thinking_harder",
-  "conversation_mode": false
+  "conversation_mode": false,
+  "image": "data:image/jpeg;base64,... | null"
 }
 ```
+
+> When `image` is provided, the request is automatically routed to the thinking tier (vision-capable model) regardless of `mode`.
 
 ### POST /chat Response
 
@@ -451,24 +510,36 @@ Returns `audio/mpeg` binary (MP3).
 | `profiles` | User profile information (auto-created on signup via trigger) |
 | `chat_sessions` | Chat conversation sessions |
 | `chat_messages` | Individual messages with `reasoning_content` and `mode_used` |
-| `documents` | Uploaded document metadata (future RAG) |
-| `document_chunks` | Document chunks with embeddings (future RAG) |
+| `message_images` | Image attachments for chat messages (metadata; bytes in Supabase Storage) |
+| `documents` | Uploaded document metadata for RAG |
+| `document_chunks` | Document chunks with pgvector embeddings + tsvector for BM25 |
+| `session_documents` | Per-session document attachments (full text, no embedding) |
 
 ### Entity Relationship
 
 ```
-profiles (1) ─────< chat_sessions (1) ─────< chat_messages
-    │
+profiles (1) ─────< chat_sessions (1) ─────< chat_messages (1) ────< message_images
+    │                     │
+    │                     └──────────────< session_documents
     └──────────────< documents (1) ────────< document_chunks
 ```
+
+### Storage Buckets
+
+| Bucket | Purpose |
+|--------|---------|
+| `documents` | Uploaded RAG documents (PDF, DOCX, TXT, MD) |
+| `chat-images` | Image attachments from chat messages (JPEG, PNG, GIF, WebP) |
 
 ### Key Schema Details
 
 - `chat_messages.reasoning_content` — stores the `<think>` block content separately
 - `chat_messages.mode_used` — constrained to `instant`, `thinking`, `thinking_harder`
+- `message_images.storage_path` — path in Supabase Storage `chat-images` bucket
+- `document_chunks.embedding` — pgvector 1536-dimensional vectors (HNSW index)
+- `document_chunks.content` — tsvector GIN index for BM25 full-text search
 - `auth.users` trigger auto-creates a `profiles` row on signup
 - `chat_messages` trigger auto-updates `chat_sessions.updated_at`
-- pgvector extension with IVFFlat index for future RAG similarity search
 
 ### Row-Level Security (RLS)
 
@@ -477,7 +548,11 @@ All tables have RLS enabled. Users can only access their own data:
 - `profiles`: Users can view/update only their own profile
 - `chat_sessions`: Users can CRUD only their own sessions
 - `chat_messages`: Users can CRUD only messages in their sessions
+- `message_images`: Users can view/insert/delete only their own images
 - `documents`: Users can CRUD only their own documents
+- `document_chunks`: Users can view/insert/delete only their own chunks
+- `session_documents`: Users can CRUD only their own session attachments
+- `storage.objects`: Users can only access files in their own folder (`user_id/...`)
 
 ### Migrations
 
@@ -486,6 +561,15 @@ All tables have RLS enabled. Users can only access their own data:
 | `20260222000000_initial_schema.sql` | Initial schema: profiles, sessions, messages, documents, chunks, RLS, triggers, storage |
 | `20260310000000_add_reasoning_content.sql` | Adds `reasoning_content` column to `chat_messages` |
 | `20260310100000_add_thinking_harder_mode.sql` | Adds `thinking_harder` to `mode_used` check constraint |
+| `20260312000000_embedding_384_dim.sql` | Initial embedding dimension setup |
+| `20260319192337_fix_embedding_index.sql` | Fix pgvector embedding index |
+| `20260319192338_session_documents.sql` | Session document attachments table |
+| `20260320000000_embedding_1536_dim.sql` | Upgrade to 1536-dimensional embeddings |
+| `20260321000000_hnsw_tuning.sql` | HNSW index tuning for better recall |
+| `20260321100000_hybrid_search.sql` | Add tsvector column + GIN index for BM25 search |
+| `20260321200000_contextual_retrieval.sql` | Contextual retrieval metadata column |
+| `20260321300000_rag_metrics.sql` | RAG evaluation metrics support |
+| `20260322000000_message_images.sql` | Image attachments table + `chat-images` storage bucket |
 
 ## Two-Machine Setup
 
@@ -515,8 +599,8 @@ Browser → Webapp (:3000) → Gateway (:8000) ──┬──→ MLX Thinking (
 | **Think Harder** | `Qwen3.5-9B-4bit` | `mlx_vlm.server` | 8080 | `/chat/completions` | Yes (8K budget) | Complex problems |
 
 > **Why mlx_vlm for the 9B?** Qwen 3.5 is a VLM (Vision-Language Model) that includes an image/video encoder.
-> It requires `mlx-vlm` (which supports vision models). It works great for text chat and
-> *also* has vision capabilities for future use.
+> It requires `mlx-vlm` (which supports vision models). It handles text chat, chain-of-thought reasoning,
+> *and* image understanding — all in one model. Images are auto-compressed to max 1024px to stay within 16GB memory.
 
 > **Why mlx_lm for the 4B?** The 4B Instruct model is text-only, so it uses the lighter `mlx_lm.server`.
 
@@ -795,8 +879,10 @@ brew install ffmpeg                        # Required for audio conversion
 | **Backend** | Pydantic | 2.9.0 |
 | **Auth & DB** | Supabase (Auth, Postgres, Storage) | — |
 | **Inference** | MLX / mlx-vlm / mlx-lm | Latest |
-| **Thinking LLM** | Qwen 3.5 9B (4-bit) | — |
-| **Instant LLM** | Qwen 3.5 4B Instruct (4-bit) | — |
+| **Thinking LLM** | Qwen 3.5 9B (4-bit, VLM — text + vision) | — |
+| **Instant LLM** | Qwen 3.5 4B Instruct (4-bit, text-only) | — |
+| **Embeddings** | sentence-transformers (Orange/orange-nomic-v1.5-1536) | — |
+| **Reranking** | cross-encoder/ms-marco-MiniLM-L6-v2 | — |
 | **STT** | faster-whisper (tiny model) | 1.1.1 |
 | **TTS** | Kokoro FastAPI (Docker) | Latest |
 | **Web Search** | SearXNG (Docker) | Latest |
@@ -822,7 +908,7 @@ brew install ffmpeg                        # Required for audio conversion
 - [x] SSE streaming with reasoning_content support
 - [x] Instant tier (Qwen 3.5 4B via mlx_lm)
 
-### Phase 3: Voice & Search ✅ (Current)
+### Phase 3: Voice & Search ✅
 - [x] Speech-to-text (faster-whisper)
 - [x] Text-to-speech (Kokoro TTS via Docker)
 - [x] Voice conversation mode ("Alfred")
@@ -830,20 +916,37 @@ brew install ffmpeg                        # Required for audio conversion
 - [x] Silence detection (auto-stop recording)
 - [x] Speaker verification (MFCC voice enrollment)
 - [x] Web search (SearXNG, self-hosted)
+- [x] LLM-powered search intent classification (three-tier routing)
+- [x] Full-page content fetching (trafilatura)
+- [x] Source trust classification and duplicate detection
 - [x] Search results cited in responses with source URLs
 
-### Phase 4: RAG (Document Memory)
-- [ ] File upload functionality
-- [ ] Document processing pipeline
-- [ ] Embedding generation
-- [ ] Context retrieval
+### Phase 4: RAG & Vision ✅ (Current)
+- [x] Document upload (PDF, DOCX, TXT, MD) with text extraction
+- [x] Chunking with overlap (1024 chars, 128 overlap, markdown-aware)
+- [x] Embedding generation (Orange/orange-nomic-v1.5-1536)
+- [x] Hybrid search (vector + BM25 with RRF fusion)
+- [x] Cross-encoder reranking (ms-marco-MiniLM-L6-v2)
+- [x] Contextual retrieval (LLM-generated chunk context prefixes)
+- [x] Session document attachments ("Attach to Chat")
+- [x] RAG quality metrics (hit rate, MRR, latency)
+- [x] Evidence summary for model confidence calibration
+- [x] Image understanding (vision) — file picker, paste, drag-and-drop
+- [x] Image compression (max 1024px) for memory safety
+- [x] Image storage in Supabase Storage with RLS
+- [x] Image display in chat history
 
-### Phase 5: Tools Framework
+### Phase 5: Polish & Tools
+- [ ] Copy button on code blocks
+- [ ] Regenerate message button
+- [ ] Session search/filter
+- [ ] Inline source citations ([1], [2] in text)
+- [ ] Math/LaTeX rendering
+- [ ] Conversation export (PDF/markdown)
 - [ ] Custom tool support
-- [ ] Note saving
-- [ ] Calendar integration
 
 ### Phase 6: Production Launch
+- [ ] OAuth sign-in (GitHub, Google)
 - [ ] Hosted Supabase migration
 - [ ] Public web app deployment
 - [ ] Rate limiting
